@@ -8,5 +8,3 @@
 
 int eth_srv_init();
 void eth_srv_deinit();
-int eth_srv_start();
-int eth_srv_loop();

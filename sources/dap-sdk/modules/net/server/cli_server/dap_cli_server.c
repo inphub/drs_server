@@ -405,13 +405,13 @@ int dap_cli_server_init(bool a_debug_more,const char * a_socket_path_or_address,
     // create thread for waiting of clients
     pthread_t l_thread_id;
 
-    l_listen_port = dap_config_get_item_uint16_default( g_config, "conserver", "listen_port_tcp",0);
+    l_listen_port = dap_config_get_item_uint16_default( g_config, "cli", "listen_port_tcp",0);
 
-    const char * l_listen_unix_socket_path = dap_config_get_item_str( g_config, "conserver", "listen_unix_socket_path");
+    const char * l_listen_unix_socket_path = dap_config_get_item_str( g_config, "cli", "listen_unix_socket_path");
 
 
 
-    const char * l_listen_unix_socket_permissions_str = dap_config_get_item_str( g_config, "conserver", "listen_unix_socket_permissions");
+    const char * l_listen_unix_socket_permissions_str = dap_config_get_item_str( g_config, "cli", "listen_unix_socket_permissions");
     mode_t l_listen_unix_socket_permissions = 0770;
 
     if ( l_listen_unix_socket_path && l_listen_unix_socket_permissions ) {
@@ -473,7 +473,7 @@ int dap_cli_server_init(bool a_debug_more,const char * a_socket_path_or_address,
     }
     else if (l_listen_port ){
 
-        const char *l_listen_addr_str = dap_config_get_item_str(g_config, "conserver", "listen_address");
+        const char *l_listen_addr_str = dap_config_get_item_str(g_config, "cli", "listen_address");
 
         log_it( L_INFO, "Console interace on addr %s port %u ", l_listen_addr_str, l_listen_port );
 

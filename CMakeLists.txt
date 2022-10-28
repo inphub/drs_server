@@ -27,18 +27,22 @@ set(DAPSDK_MODULES "core crypto io app-cli")
 add_subdirectory(sources/dap-sdk)
 
 # Подключаем библиотеку DRS
-add_subdirectory(sources/drs)
+add_subdirectory(libs/libdrs)
 
 # ---- Непосредственно подключение файлов проекта ---
 
 # Сервер
 set (SERVER_SOURCES
-    sources/main_server.c
-    sources/sig_unix_handler.c
-    sources/eth_srv.c
+     sources/main_server.c
+     sources/drs_proto.c
+     sources/drs_proto_cmd.c
+     sources/sig_unix_handler.c
+#     sources/eth_srv.c
     )
 set (SERVER_HEADERS
-    sources/eth_srv.h
+     sources/drs_proto.h
+     sources/drs_proto_cmd.h
+#     sources/eth_srv.h
     sources/sig_unix_handler.h
     )
 # Консолька к серверу
@@ -48,7 +52,7 @@ set (CLI_SOURCES
 
 # Тесты
 set (TESTS_SOURCES
-    sources/main_server.c
+    sources/main_server2.c
     )
 set (TESTS_HEADERS
     sources/main.c
@@ -56,11 +60,11 @@ set (TESTS_HEADERS
 
 
 #-- Определяем исполняемый файл и библиотеки к нему
-add_executable(${PROJECT_NAME} ${SERVER_SOURCES} ${SERVER_HEADERS})
+add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
 target_link_libraries(${PROJECT_NAME} dap_core dap_crypto dap_io dap_cli_server drs)
 
-add_executable(${PROJECT_NAME}_cli ${CLI_SOURCES})
-target_link_libraries(${PROJECT_NAME}_cli dap_core dap_app_cli)
+add_executable(drs_client ${CLI_SOURCES})
+target_link_libraries(drs_client dap_core dap_app_cli)
 
 #--- Описываем действия при инсталляции
 set(CMAKE_INSTALL_PREFIX /opt/drs_server)
@@ -72,5 +76,5 @@ set(RLIBDIR ${CMAKE_INSTALL_PREFIX}/lib)
 set(SHAREDIR ${CMAKE_INSTALL_PREFIX}/share)
 
 INSTALL(DIRECTORY dist/ DESTINATION ${SHAREDIR} FILES_MATCHING PATTERN "*" PATTERN "*")
-INSTALL(TARGETS ${PROJECT_NAME} DESTINATION ${BINDIR})
-INSTALL(TARGETS ${PROJECT_NAME}_cli DESTINATION ${BINDIR})
+INSTALL(TARGETS drs_server DESTINATION ${BINDIR})
+INSTALL(TARGETS drs_client DESTINATION ${BINDIR})

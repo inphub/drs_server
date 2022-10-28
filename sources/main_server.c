@@ -9,7 +9,8 @@
 #include <dap_file_utils.h>
 #include <dap_cli_server.h>
 
-#include "eth_srv.h"
+//#include "eth_srv.h"
+#include "drs_proto.h"
 #include "sig_unix_handler.h"
 
 
@@ -62,14 +63,13 @@ int main(int argc, const char **argv)
     if (!g_config) {
         return -1;
     }
-    printf("DRS Server\n");
 
     log_it( L_DAP, "*** DRS Server version: %s ***", DAP_VERSION );
 
     // change to dap_config_get_item_int_default when it's will be possible
     size_t l_thread_cnt = 0;
 
-    const char *s_thrd_cnt = dap_config_get_item_str( g_config, "resources", "threads_cnt" );
+    const char *s_thrd_cnt = dap_config_get_item_str( g_config, "general", "threads_limit" );
     if ( s_thrd_cnt != NULL )
         l_thread_cnt = (size_t)atoi( s_thrd_cnt );
 
@@ -84,7 +84,7 @@ int main(int argc, const char **argv)
     }
 
 
-    s_pid_file_path = dap_config_get_item_str_default( g_config,  "resources", "pid_path","/tmp") ;
+    s_pid_file_path = dap_config_get_item_str_default( g_config,  "general", "pid_path","/tmp") ;
     log_it(L_DEBUG, "Parsing command line args");
     parse_args( argc, argv );
 
@@ -133,7 +133,7 @@ int main(int argc, const char **argv)
 
     // Инициируем обработчики юникс сигналов
     if (sig_unix_handler_init(dap_config_get_item_str_default(g_config,
-                                                              "resources",
+                                                              "general",
                                                               "pid_path",
                                                               "/tmp")) != 0) {
         log_it(L_CRITICAL,"Can't init sig unix handler module");
@@ -142,36 +142,32 @@ int main(int argc, const char **argv)
 
     save_process_pid_in_file(s_pid_file_path);
 
-    // Инициализация сервера
-
-    if(eth_srv_init() == 0)
-        eth_srv_start();
-    else
-        log_it(L_CRITICAL, "Can't init eth srv");
-
-    /*if ( g_server_enabled ) {
+    dap_server_t *l_server = NULL;
+    if ( g_server_enabled ) {
 
         int32_t l_port = dap_config_get_item_int32(g_config, "server", "listen_port_tcp");
 
         if( l_port > 0 ) {
-            l_server = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
+            dap_server_t *l_server = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
                                       (uint16_t) l_port, SERVER_TCP, NULL );
         } else
             log_it( L_WARNING, "Server is enabled but no port is defined" );
 
     }
-    if ( l_server ) { // If listener server is initialized
-    }*/
+
+    // Инициализация протокола
+    if(drs_proto_init(l_server) != 0){
+        log_it(L_CRITICAL, "Can't init drs protocol");
+        return -13;
+    }
+
 
     int l_rc = 0;
-    //l_rc = dap_events_wait();
-    //log_it( l_rc ? L_CRITICAL : L_NOTICE, "Server loop stopped with return code %d", l_rc );
-
-    // Запускаем луп со старого сервера
-    l_rc = eth_srv_loop();
+    l_rc = dap_events_wait();
+    log_it( l_rc ? L_CRITICAL : L_NOTICE, "Server loop stopped with return code %d", l_rc );
 
     // Deinit modules
-    eth_srv_deinit();
+    drs_proto_deinit();
 
     dap_config_close( g_config );
     dap_interval_timer_deinit();
