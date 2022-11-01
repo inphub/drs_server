@@ -36,14 +36,14 @@ set (SERVER_SOURCES
      sources/main_server.c
      sources/drs_proto.c
      sources/drs_proto_cmd.c
+     sources/drs_cli.c
      sources/sig_unix_handler.c
-#     sources/eth_srv.c
     )
 set (SERVER_HEADERS
      sources/drs_proto.h
      sources/drs_proto_cmd.h
-#     sources/eth_srv.h
-    sources/sig_unix_handler.h
+     sources/drs_cli.h
+     sources/sig_unix_handler.h
     )
 # Консолька к серверу
 set (CLI_SOURCES

@@ -202,7 +202,7 @@ int main(int argc, const char *argv[])
         exit(-1);
     }
 
-    const char* listen_socket = dap_config_get_item_str( g_config, "conserver", "listen_unix_socket_path"); // unix socket mode
+    const char* listen_socket = dap_config_get_item_str( g_config, "cli", "listen_unix_socket_path"); // unix socket mode
 
     cparam = dap_app_cli_connect(listen_socket);
     if(!cparam)

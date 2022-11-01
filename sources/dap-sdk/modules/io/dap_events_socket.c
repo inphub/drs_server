@@ -1731,13 +1731,14 @@ size_t dap_events_socket_pop_from_buf_in(dap_events_socket_t *a_es, void *a_data
 {
     if ( a_data_size < a_es->buf_in_size)
     {
-        memcpy(a_data, a_es->buf_in, a_data_size);
+        if( a_data)
+            memcpy(a_data, a_es->buf_in, a_data_size);
         memmove(a_es->buf_in, a_es->buf_in + a_data_size, a_es->buf_in_size - a_data_size);
     } else {
         if ( a_data_size > a_es->buf_in_size )
             a_data_size = a_es->buf_in_size;
-
-        memcpy(a_data, a_es->buf_in, a_data_size);
+        if(a_data)
+            memcpy(a_data, a_es->buf_in, a_data_size);
     }
 
     a_es->buf_in_size -= a_data_size;

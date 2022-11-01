@@ -149,8 +149,23 @@ static void s_callback_new (dap_events_socket_t * a_es,void * a_arg )
  */
 static void s_callback_read (dap_events_socket_t * a_es,void * a_arg )
 {
+    uint32_t l_cmd, * l_cmd_args;
     UNUSED(a_arg);
+    if (a_es->buf_in_size < sizeof(uint32_t)) // Проверяем, достаточно ли у нас данных накопилось хотя бы для номера команды
+        return; // вернёмся сюда тогда, когда клиент вышлет ещё данных
 
+    l_cmd = *((uint32_t*) a_es->buf_in); // Читаем команду
+
+    size_t l_cmd_size = sizeof(uint32_t) + g_drs_proto_args_size[l_cmd];
+    if( a_es->buf_in_size < l_cmd_size )
+        return; // вернёмся сюда тогда, когда клиент вышлет ещё данных
+
+    l_cmd_args = (uint32_t*) (a_es->buf_in + sizeof(uint32_t)); // Тут наши аргументы команды
+
+    // сдвигаем буфер на l_cmd_size через memmove()
+    dap_events_socket_shrink_buf_in(a_es, l_cmd_size);
+
+    drs_proto_cmd( a_es, (drs_proto_cmd_t) l_cmd, l_cmd_args);
 }
 
 /**

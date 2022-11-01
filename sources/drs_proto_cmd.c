@@ -16,21 +16,33 @@
 
 #define LOG_TAG "drs_proto_cmd"
 
-size_t g_drs_proto_args_min_count[]={
-    [CMD_IDLE]=0,
-    [CMD_SHIFT_READ_DRS1]=0
+size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
+    [CMD_REG_WRITE]           = 2 * sizeof(uint32_t),
+    [CMD_REG_READ]            = 1 * sizeof(uint32_t),
+
+    [CMD_PAGE_READ_DRS1]      = 1 * sizeof(uint32_t),
+    [CMD_PAGE_READ_DRS2]      = 1 * sizeof(uint32_t),
+    [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
+    [CMD_INI_WRITE]           = sizeof(*g_ini),
+    [CMD_CALIBRATE]           = 6 * sizeof(uint32_t),
+    [CMD_READ]                = 3 * sizeof(uint32_t),
+    [CMD_SHIFT_DAC_SET]       = 1 * sizeof(uint32_t),
+    [CMD_FF]                  = 1 * sizeof(uint32_t),
+    [CMD_GET_SHIFT]           = 1 * sizeof(uint32_t),
+    [CMD_START]               = 2 * sizeof(uint32_t),
+    [CMD_READ_PAGE]           = 3 * sizeof(uint32_t),
 };
 
 #define MAX_PAGE_COUNT 1000
 #define SIZE_FAST MAX_PAGE_COUNT*1024*8*8
 
-coefficients COEFF = {0};
+coefficients COEFF = {};
 uint32_t shift [DRS_COUNT * 1024] = {0};
 unsigned short tmasFast[SIZE_FAST] = {0};
 double ddata[16384] = {0};
 
 
-void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args, size_t a_cmd_args_count)
+void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
     uint32_t l_addr = 0, l_value = 0;
     log_it(L_DEBUG, "Proto cmd 0x%08X", a_cmd);
@@ -87,7 +99,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
         case CMD_INI_FILE_WRITE: //write file ini
         case CMD_INI_WRITE: //write ini
             log_it(L_DEBUG, "write ini (size %zd)", a_es->buf_in_size);
-            memcpy(g_ini, a_cmd_args, MIN( a_cmd_args_count* sizeof(*a_cmd_args), sizeof(*g_ini)) );
+            memcpy(g_ini, a_cmd_args, sizeof(*g_ini) );
             l_value=0;
             dap_events_socket_write_unsafe ( a_es, &l_value, sizeof(l_value));
         break;
@@ -166,7 +178,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             //setSizeSamples(1024);//Peter fix
             if((a_cmd_args[0]&1)==1){
                 log_it(L_DEBUG, "start amplitude calibrate\n");
-                l_value=calibrateAmplitude(&COEFF,calibLvl,a_cmd_args[1],shiftDAC,g_ini,a_cmd_args[4]+2)&1;
+                l_value=calibrate_amplitude(&COEFF,calibLvl,a_cmd_args[1],shiftDAC,g_ini,a_cmd_args[4]+2)&1;
                 if(l_value==1){
                     log_it(L_DEBUG, "end amplitude calibrate");
                 }else{
@@ -175,7 +187,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }
             if((a_cmd_args[0]&2)==2){
                 log_it(L_DEBUG, "start time calibrate");
-                l_value|=(timeCalibration(a_cmd_args[2],&COEFF,g_ini)<<1)&2;
+                l_value|=(calibrate_time(a_cmd_args[2],&COEFF,g_ini)<<1)&2;
                 if((l_value&2)==2){
                     log_it(L_DEBUG, "end time calibrate");
                 }else{
@@ -184,7 +196,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }
             if((a_cmd_args[0]&4)==4){
                 log_it(L_DEBUG, "start global time calibrate");
-                l_value|=(globalTimeCalibration(a_cmd_args[3],&COEFF,g_ini)<<2)&4;
+                l_value|=(calibrate_time_global(a_cmd_args[3],&COEFF,g_ini)<<2)&4;
                 if((l_value&4)==4){
                     log_it(L_DEBUG, "end global time calibrate");
                 }else{
@@ -192,7 +204,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 }
             }
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
-        break;
+        }break;
 
         case CMD_READ:
             /*
@@ -213,12 +225,12 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 readNPages(&tmasFast[0],shift,a_cmd_args[0], l_value*16384, 0);//8192
                 //readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
             }
-            for(t=0;t<a_cmd_args[0];t++) {
-                doColibrateCurgr(&tmasFast[t*8192*l_value],ddata,&shift[t],&COEFF,1024,8,a_cmd_args[2],g_ini);
+            for(size_t t=0;t<a_cmd_args[0];t++) {
+                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,&shift[t],&COEFF,1024,8,a_cmd_args[2],g_ini);
                 log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){
-                    getXArray(ddata,&shift[t],&COEFF,a_cmd_args[2]);
+                    calibrate_get_array_x(ddata,&shift[t],&COEFF,a_cmd_args[2]);
                     memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
                 }
             }
@@ -226,9 +238,9 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             drs_proto_out_add_mem(DRS_PROTO(a_es), tmasFast,2*8192*a_cmd_args[0]*l_value);
         break;
 
-        case CMD_SHIFT_DAC_SET:
+        case CMD_SHIFT_DAC_SET:{
             //set shift DAC
-            shiftDAC=(double *)(&a_cmd_args[0]);
+            double *shiftDAC=(double *)(&a_cmd_args[0]);
             for(size_t t=0;t<4;t++){
             log_it(L_DEBUG, "%f",shiftDAC[t]);
             }
@@ -236,7 +248,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             setDAC(1);
             l_value=1;
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
-        break;
+        }break;
 
         case CMD_FF:
             log_it(L_DEBUG,"ff %d",a_cmd_args[0]);
@@ -340,20 +352,18 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 //                                		 readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
             }
             for(size_t t=0;t<a_cmd_args[0];t++){
-                doColibrateCurgr(&tmasFast[t*8192*l_value],ddata,shift[t],&COEFF,1024,4,a_cmd_args[2],g_ini);
-                printf("tmasFast[%d]=%f shift[%d]=%d\n",t*8192,ddata[0],t,shift[t]);
+                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,shift,&COEFF,1024,4,a_cmd_args[2],g_ini);
+                log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){
-                    getXArray(ddata,shift[t],&COEFF,a_cmd_args[2]);
+                    calibrate_get_array_x(ddata,shift,&COEFF,a_cmd_args[2]);
                     memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
                 }
             }
-            printf("buferSize=%u\n",2*8192*a_cmd_args[0]*l_value);
+            log_it(L_DEBUG, "buferSize=%u",2*8192*a_cmd_args[0]*l_value);
             drs_proto_out_add_mem(DRS_PROTO(a_es), tmasFast,2*8192*a_cmd_args[0]*l_value);
         break;
-     default:
-         break;
-    }
+        default: log_it(L_WARNING, "Unknown command %d", a_cmd);
     }
 }
 

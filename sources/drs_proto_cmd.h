@@ -2,7 +2,7 @@
  * drs_proto_cmd.h
  *
  *  Created on: 25 October 2022
- *      Author: Dmitriy Gerasimov
+ *      Author: Dmitriy Gerasimov <dmitry.gerasimov@demlabs.net>
  */
 #pragma once
 #include <dap_common.h>
@@ -40,7 +40,10 @@ typedef enum drs_proto_cmd{
     CMD_READ_PAGE          = 0x13, //read
 } drs_proto_cmd_t;
 
-extern size_t g_drs_proto_args_min_count[];
+// Максимальный номер команды
+#define DRS_PROTO_CMD_MAX 0xFF
 
-void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args, size_t a_cmd_args_count);
+extern size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX];
+
+void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args);
 

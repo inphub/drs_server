@@ -9,8 +9,8 @@
 #include <dap_file_utils.h>
 #include <dap_cli_server.h>
 
-//#include "eth_srv.h"
 #include "drs_proto.h"
+#include "drs_cli.h"
 #include "sig_unix_handler.h"
 
 
@@ -161,6 +161,11 @@ int main(int argc, const char **argv)
         return -13;
     }
 
+    // Инициализация консоли
+    if (drs_cli_init() != 0){
+        log_it(L_CRITICAL, "Can't init drs cli");
+        return -14;
+    }
 
     int l_rc = 0;
     l_rc = dap_events_wait();
