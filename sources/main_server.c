@@ -11,6 +11,7 @@
 
 #include "drs_proto.h"
 #include "drs_cli.h"
+#include "drs.h"
 #include "sig_unix_handler.h"
 
 
@@ -155,11 +156,20 @@ int main(int argc, const char **argv)
 
     }
 
+    // Инициализация DRS
+    init_mem();
+
+    /*if(drs_init(NULL) != 0){
+        log_it(L_CRITICAL, "Can't init drs protocol");
+        return -12;
+    }*/
+
     // Инициализация протокола
     if(drs_proto_init(l_server) != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -13;
     }
+
 
     // Инициализация консоли
     if (drs_cli_init() != 0){

@@ -34,11 +34,10 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 };
 
 #define MAX_PAGE_COUNT 1000
-#define SIZE_FAST MAX_PAGE_COUNT*1024*8*8
+//#define SIZE_FAST MAX_PAGE_COUNT*1024*8*8
 
-coefficients COEFF = {};
+coefficients_t COEFF = {};
 uint32_t shift [DRS_COUNT * 1024] = {0};
-unsigned short tmasFast[SIZE_FAST] = {0};
 double ddata[16384] = {0};
 
 
