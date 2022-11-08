@@ -191,8 +191,8 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
 
     switch (l_cmd_num){
         case CMD_WRITE_READY:{
-                unsigned int l_flag=drs_get_flag_write_ready(l_drs_num);
-                dap_cli_server_cmd_set_reply_text( a_str_reply, "0x%08X", l_flag);
+                bool l_flag_ready=drs_get_flag_write_ready(l_drs_num);
+                dap_cli_server_cmd_set_reply_text( a_str_reply, "DRS #%d is %s", l_flag_ready? "ready": "not ready");
         }break;
         case CMD_PAGE:{
             if(l_drs_num!=-1){
