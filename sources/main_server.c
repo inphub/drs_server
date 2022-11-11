@@ -11,6 +11,7 @@
 
 #include "drs_proto.h"
 #include "drs_cli.h"
+#include "drs_calibrate.h"
 #include "drs.h"
 #include "sig_unix_handler.h"
 
@@ -163,6 +164,7 @@ int main(int argc, const char **argv)
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -12;
     }*/
+    drs_calibrate_init();
 
     // Инициализация протокола
     if(drs_proto_init(l_server) != 0){
@@ -183,7 +185,7 @@ int main(int argc, const char **argv)
 
     // Deinit modules
     drs_proto_deinit();
-
+    drs_calibrate_deinit();
     dap_config_close( g_config );
     dap_interval_timer_deinit();
     dap_common_deinit();

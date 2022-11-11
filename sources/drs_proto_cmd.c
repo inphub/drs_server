@@ -12,6 +12,7 @@
 
 #include "commands.h"
 #include "calibrate.h"
+#include "drs_calibrate.h"
 #include "data_operations.h"
 
 #define LOG_TAG "drs_proto_cmd"
@@ -24,7 +25,7 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_PAGE_READ_DRS2]      = 1 * sizeof(uint32_t),
     [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
     [CMD_INI_WRITE]           = sizeof(*g_ini),
-    [CMD_CALIBRATE]           = 6 * sizeof(uint32_t),
+    [CMD_CALIBRATE_OLD]           = 6 * sizeof(uint32_t),
     [CMD_READ]                = 3 * sizeof(uint32_t),
     [CMD_SHIFT_DAC_SET]       = 1 * sizeof(uint32_t),
     [CMD_FF]                  = 1 * sizeof(uint32_t),
@@ -142,7 +143,72 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             log_it( L_DEBUG, "read shift: %4lu\n", ((unsigned long *)data_map_shift_drs1)[0]);
         }break;
 
-        case CMD_CALIBRATE:{         /*
+
+        case CMD_CALIBRATE_RUN:{/*
+            calibrate
+
+            a_cmd_args[0] - ключи калибровки, 1 бит амплитудна€,2 локальна€ временна€,3 глобальна€ временна€
+            a_cmd_args[1] - N c клиента, количество проходов аплитудной калибровки дл€ каждого уровн€ цапов
+            a_cmd_args[2] - Min N с клиента, минимальное число набора статистики дл€ каждой €чейки в локальной калибровке
+            a_cmd_args[3] - numCylce, число проходов в глобальной колибровке
+            a_cmd_args[4] - количество уровней у амплитудной калибровки count,
+            дл€ каждого будет N(из a_cmd_args[2]) проходов,
+            при нуле будут выполн€тьс€ два прохода дл€ уровней BegServ и EndServ(о них ниже),
+            при не нулевом значении, между  BegServ и EndServ будут включены count дополнительных уровней цапов дл€ амплитудной калибровки
+            с a_cmd_args[5] идет массив даблов, первые 2 элемента BegServ и EndServ
+            остальные 8 сдвиги цапов
+            */
+
+            // ѕодготавливаем параметры калибровки
+            double * l_levels=(double *)(&a_cmd_args[5]);
+            drs_calibrate_params_t l_params = {
+                .ampl = {
+                    .repeats_count = a_cmd_args[1],
+                    .levels_count = a_cmd_args[4],
+                },
+                .time_global = {
+                    .num_cycle = a_cmd_args[3]
+                },
+                .time_local = {
+                    .min_N = a_cmd_args[2]
+                }
+            };
+            memcpy(l_params.ampl.levels, l_levels,sizeof (l_params.ampl.levels) );
+
+            // ѕодготавливаем флаги
+            uint32_t l_flags = 0;
+            if ( a_cmd_args[0] & 1)
+                l_flags |= DRS_CAL_FLAG_AMPL;
+            if ( a_cmd_args[0] & 2)
+                l_flags |= DRS_CAL_FLAG_TIME_LOCAL;
+            if ( a_cmd_args[0] & 4)
+                l_flags |= DRS_CAL_FLAG_TIME_GLOBAL;
+
+            int l_ret = drs_calibrate_run(-1,l_flags, &l_params);
+            dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
+        }break;
+
+        case CMD_CALIBRATE_PROGRESS:{
+            /*
+             * a_cmd_arg[0]  - Ќомер провер€емой DRS
+             *
+             * ¬озвращает код состо€ни€ от 0 до 1 либо -1 если калибровка уже не идЄт
+             */
+            int l_ret = drs_calibrate_progress( a_cmd_args[0]);
+            dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
+        }break;
+
+        case CMD_CALIBRATE_ABORT:{
+            /*
+             * a_cmd_arg[0]  - Ќомер провер€емой DRS
+             *
+             * ¬озвращает код состо€ни€ от 0 до 1 либо -1 если калибровка уже не идЄт, -2 если неверно задан номер DRS
+             */
+            int l_ret = drs_calibrate_abort( a_cmd_args[0]);
+            dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
+        }break;
+
+        case CMD_CALIBRATE_OLD:{         /*
             calibrate
 
             a_cmd_args[0] - ключи калибровки, 1 бит амплитудна€,2 локальна€ временна€,3 глобальна€ временна€
