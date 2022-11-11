@@ -165,6 +165,7 @@ static void s_queue_add_es_callback( dap_events_socket_t * a_es, void * a_arg)
     }
     int l_ret = dap_context_add(l_context, l_es_new);
 
+    l_es_new->worker = a_es->worker;
     l_es_new->last_time_active = time(NULL);
     // We need to differ new and reassigned esockets. If its new - is_initialized is false
     if ( ! l_es_new->is_initalized ){

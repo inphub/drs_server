@@ -60,10 +60,10 @@ int drs_cli_init()
     // Calibrate
     dap_cli_server_cmd_add ("calibrate", s_callback_calibrate, "Calibrate DRS",
                 "\n"
-                "calibrate run [-drs <DRS number>]  -flags <AMPL,TIME_GLOBAL,TIME_LOCAL> -repeats <Repeats for Ampl>\n"
+                "calibrate run [-drs <DRS number>]  -flags <AMPL,TIME_GLOBAL,TIME_LOCAL> [-repeats <repeats for Ampl>\n"
                 "               -begin <Begin level> -end <End level> -shifts <Shifts for every DCA, splitted with \",\">\n"
-                "               -levels_count <Number of levels for ampl cal> -num_cycle <Cycles number for time global>\n "
-                "               -min_N <Minimal N for time local calibration\n"
+                "               -N <Number of levels for ampl cal>] [-num_cycle <Cycles number for time global>]\n "
+                "               [-min_N <Minimal N for time local calibration>]\n"
                 "\tRun calibration process for specified DRS number or for all channels if number is not specified\n"
                 "\n"
                 "calibrate check [-drs <DRS number>]\n"
@@ -260,29 +260,13 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
         if (strcmp(a_argv[1], "run") == 0 ){ // Subcommand "run"
 
             // Читаем аргументы к команде
-            const char * l_repeats_str = NULL;
             const char * l_flags_str = NULL;
-            const char * l_levels_count_str = NULL;
-            const char * l_begin_str = NULL;
-            const char * l_end_str = NULL;
-            const char * l_shifts_str = NULL;
-            const char * l_num_cycle_str = NULL;
-            const char * l_min_N_str = NULL;
 
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-repeats",      &l_repeats_str);
             dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-flags",        &l_flags_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-begin",        &l_begin_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-end",          &l_end_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-shifts",       &l_shifts_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-levels_count", &l_levels_count_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-num_cycle",    &l_num_cycle_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-min_N",        &l_min_N_str);
 
-            // Проверяем наличие всех аргументов
-
-            if ( ! ( l_repeats_str && l_flags_str && l_levels_count_str && l_begin_str && l_end_str &&
-                 l_shifts_str && l_num_cycle_str && l_min_N_str ) ){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "One of arguments is missed, check help for the command");
+            // Проверяем наличие флагов
+            if ( ! (l_flags_str)  ){
+                dap_cli_server_cmd_set_reply_text(a_str_reply, "Flags arguments is missed, check help for the command");
                 return -2;
             }
 
@@ -295,6 +279,14 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 return -21;
             }
             uint32_t l_flags = 0;
+            unsigned l_min_N = 0;
+            double l_begin = 0;
+            double l_end = 0;
+            double l_shifts[DCA_COUNT] ={};
+            unsigned l_repeats = 0;
+            unsigned l_num_cycle = 0;
+            unsigned l_N = 0;
+
             for (size_t i = 0; l_flags_strs[i]; i ++){
                 // Подготавливаем флаги
                 if ( dap_strcmp(l_flags_strs[i], "AMPL") == 0)
@@ -304,90 +296,118 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 if ( dap_strcmp(l_flags_strs[i], "TIME_GLOBAL") == 0)
                     l_flags |= DRS_CAL_FLAG_TIME_GLOBAL;
             }
-            // Конвертируем смещения
-            char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DCA_COUNT);
-            if (l_shifts_strs == NULL){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts argument is empty");
-                return -22;
-            }
-            double l_shifts[DCA_COUNT] ={};
-            size_t l_shifts_num =0;
-            for ( l_shifts_num = 0; l_shifts_strs[l_shifts_num]; l_shifts_num ++){
-                char * l_shift_str = l_shifts_strs[l_shifts_num];
-                char * l_shift_str_endptr = NULL;
-                double l_shift = strtod( l_shift_str, & l_shift_str_endptr);
-                if (l_shift_str_endptr == l_shift_str){
-                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shift #%i can't be converted to double value (\"%s\"",
-                                                      l_shifts_num,l_shift_str);
-                    return -23;
+
+            // Амплитудная калибровка
+            if (l_flags & DRS_CAL_FLAG_AMPL){
+                const char * l_repeats_str = NULL;
+                const char * l_N_str = NULL;
+                const char * l_begin_str = NULL;
+                const char * l_end_str = NULL;
+                const char * l_shifts_str = NULL;
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-repeats",      &l_repeats_str);
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-begin",        &l_begin_str);
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-end",          &l_end_str);
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-shifts",       &l_shifts_str);
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-N", &l_N_str);
+
+                // Проверяем наличие всех аргументов
+                if ( ! (l_repeats_str && l_N_str && l_begin_str && l_end_str && l_shifts_str && l_N_str)  ){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Amplitude arguments is missed, check help for the command");
+                    return -2;
                 }
-                l_shifts[l_shifts_num] = l_shift;
-            }
-            if (l_shifts_num < DCA_COUNT){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too small, should be %u",
-                                                  l_shifts_num,DCA_COUNT);
-                return -24;
-            }
-            if (l_shifts_num > DCA_COUNT){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too big, should be %u",
-                                                  l_shifts_num,DCA_COUNT);
-                return -25;
+
+                // Конвертируем смещения
+                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DCA_COUNT);
+                if (l_shifts_strs == NULL){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts argument is empty");
+                    return -22;
+                }
+                size_t l_shifts_num =0;
+                for ( l_shifts_num = 0; l_shifts_strs[l_shifts_num]; l_shifts_num ++){
+                    char * l_shift_str = l_shifts_strs[l_shifts_num];
+                    char * l_shift_str_endptr = NULL;
+                    double l_shift = strtod( l_shift_str, & l_shift_str_endptr);
+                    if (l_shift_str_endptr == l_shift_str){
+                        dap_cli_server_cmd_set_reply_text(a_str_reply, "Shift #%i can't be converted to double value (\"%s\"",
+                                                          l_shifts_num,l_shift_str);
+                        return -23;
+                    }
+                    l_shifts[l_shifts_num] = l_shift;
+                }
+                if (l_shifts_num < DCA_COUNT){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too small, should be %u",
+                                                      l_shifts_num,DCA_COUNT);
+                    return -24;
+                }
+                if (l_shifts_num > DCA_COUNT){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too big, should be %u",
+                                                      l_shifts_num,DCA_COUNT);
+                    return -25;
+                }
+
+                // конвертируем begin
+                char * l_begin_str_endptr = NULL;
+                l_begin = strtod( l_begin_str, & l_begin_str_endptr);
+                if (l_begin_str_endptr == l_begin_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Begin value \"%s\" can't be converted to double", l_begin_str );
+                    return -26;
+                }
+
+                // конвертируем end
+                char * l_end_str_endptr = NULL;
+                l_end = strtod( l_end_str, & l_end_str_endptr);
+                if (l_end_str_endptr == l_end_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "End value \"%s\" can't be converted to double", l_end_str );
+                    return -27;
+                }
+
+                // конвертируем repeats
+                char * l_repeats_str_endptr = NULL;
+                l_repeats = strtoul( l_repeats_str, & l_repeats_str_endptr, 10);
+                if (l_repeats_str_endptr == l_repeats_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Repeats value \"%s\" can't be converted to unsigned integer", l_repeats_str );
+                    return -28;
+                }
+
+                // конвертируем N
+                char * l_N_str_endptr = NULL;
+                l_N = strtoul( l_N_str, & l_N_str_endptr, 10);
+                if (l_N_str_endptr == l_N_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "levels_count value \"%s\" can't be converted to unsigned integer", l_N_str );
+                    return -31;
+                }
             }
 
-            // конвертируем begin
-            char * l_begin_str_endptr = NULL;
-            double l_begin = strtod( l_begin_str, & l_begin_str_endptr);
-            if (l_begin_str_endptr == l_begin_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "Begin value \"%s\" can't be converted to double", l_begin_str );
-                return -26;
+            // Локальная временная калибровка
+            if (l_flags & DRS_CAL_FLAG_TIME_LOCAL){
+                // конвертируем min_N
+                const char * l_min_N_str = NULL;
+                char * l_min_N_str_endptr = NULL;
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-min_N",        &l_min_N_str);
+                l_min_N = strtoul( l_min_N_str, & l_min_N_str_endptr, 10);
+                if (l_min_N_str_endptr == l_min_N_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "MinN value \"%s\" can't be converted to unsigned integer", l_min_N_str );
+                    return -29;
+                }
             }
-
-            // конвертируем end
-            char * l_end_str_endptr = NULL;
-            double l_end = strtod( l_end_str, & l_end_str_endptr);
-            if (l_end_str_endptr == l_end_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "End value \"%s\" can't be converted to double", l_end_str );
-                return -27;
-            }
-
-            // конвертируем repeats
-            char * l_repeats_str_endptr = NULL;
-            unsigned l_repeats = strtoul( l_repeats_str, & l_repeats_str_endptr, 10);
-            if (l_repeats_str_endptr == l_repeats_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "Repeats value \"%s\" can't be converted to unsigned integer", l_repeats_str );
-                return -28;
-            }
-
-
-            // конвертируем min_N
-            char * l_min_N_str_endptr = NULL;
-            unsigned l_min_N = strtoul( l_min_N_str, & l_min_N_str_endptr, 10);
-            if (l_min_N_str_endptr == l_min_N_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "MinN value \"%s\" can't be converted to unsigned integer", l_min_N_str );
-                return -29;
-            }
-
-            // конвертируем num_cycle
-            char * l_num_cycle_str_endptr = NULL;
-            unsigned l_num_cycle = strtoul( l_num_cycle_str, & l_num_cycle_str_endptr, 10);
-            if (l_num_cycle_str_endptr == l_num_cycle_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "num_cycle value \"%s\" can't be converted to unsigned integer", l_num_cycle_str );
-                return -30;
-            }
-
-            // конвертируем levels_count
-            char * l_levels_count_str_endptr = NULL;
-            unsigned l_levels_count = strtoul( l_levels_count_str, & l_levels_count_str_endptr, 10);
-            if (l_levels_count_str_endptr == l_levels_count_str){
-                dap_cli_server_cmd_set_reply_text(a_str_reply, "levels_count value \"%s\" can't be converted to unsigned integer", l_levels_count_str );
-                return -31;
+            // Глобальная временная калибровка
+            if (l_flags & DRS_CAL_FLAG_TIME_GLOBAL){
+                const char * l_num_cycle_str = NULL;
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-num_cycle",    &l_num_cycle_str);
+                // конвертируем num_cycle
+                char * l_num_cycle_str_endptr = NULL;
+                l_num_cycle = strtoul( l_num_cycle_str, & l_num_cycle_str_endptr, 10);
+                if (l_num_cycle_str_endptr == l_num_cycle_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "num_cycle value \"%s\" can't be converted to unsigned integer", l_num_cycle_str );
+                    return -30;
+                }
             }
 
             // Подготавливаем параметры калибровки
             drs_calibrate_params_t l_params = {
                 .ampl = {
-                    .repeats_count = l_repeats,
-                    .levels_count = l_levels_count,
+                    .repeats = l_repeats,
+                    .N = l_N,
                     .begin = l_begin,
                     .end = l_end
                 },
@@ -398,6 +418,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                     .min_N = l_min_N
                 }
             };
+
             memcpy(l_params.ampl.shifts, l_shifts,sizeof (l_params.ampl.shifts) );
 
             dap_string_t * l_reply = dap_string_new("");

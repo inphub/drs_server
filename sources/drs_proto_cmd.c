@@ -163,8 +163,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             double * l_levels=(double *)(&a_cmd_args[5]);
             drs_calibrate_params_t l_params = {
                 .ampl = {
-                    .repeats_count = a_cmd_args[1],
-                    .levels_count = a_cmd_args[4],
+                    .repeats = a_cmd_args[1],
+                    .N = a_cmd_args[4],
                 },
                 .time_global = {
                     .num_cycle = a_cmd_args[3]
