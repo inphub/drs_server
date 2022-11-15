@@ -9,6 +9,7 @@
 
 #include <dap_events_socket.h>
 
+
 typedef enum drs_proto_cmd{
     CMD_IDLE               = 0,
 
@@ -22,6 +23,7 @@ typedef enum drs_proto_cmd{
     CMD_SHIFT_READ_DRS2    = 104, // read shift drs2
 
     CMD_INI_READ           = 6,   // read ini
+    CMD_READ_MEM           = 0x16, // read memory
     CMD_INI_WRITE          = 7,   // write ini
     CMD_INI_FILE_READ      = 8,   // read file ini
     CMD_INI_FILE_WRITE     = 9,   // write file ini

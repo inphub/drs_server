@@ -135,7 +135,7 @@ static int s_parse_drs_and_check(int a_arg_index, int a_argc, char ** a_argv, ch
 static int s_callback_init(int a_argc, char ** a_argv, char **a_str_reply)
 {
     // Инициализация DRS
-    if(drs_init(NULL) != 0){
+    if(drs_cmd_init(NULL) != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -13;
     }
@@ -408,8 +408,6 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 .ampl = {
                     .repeats = l_repeats,
                     .N = l_N,
-                    .begin = l_begin,
-                    .end = l_end
                 },
                 .time_global = {
                     .num_cycle = l_num_cycle
@@ -418,8 +416,9 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                     .min_N = l_min_N
                 }
             };
-
-            memcpy(l_params.ampl.shifts, l_shifts,sizeof (l_params.ampl.shifts) );
+            l_params.ampl.levels[0] = l_begin;
+            l_params.ampl.levels[1] = l_end;
+            memcpy(l_params.ampl.levels+2, l_shifts,sizeof (l_params.ampl.repeats)-2 *sizeof(double) );
 
             dap_string_t * l_reply = dap_string_new("");
 

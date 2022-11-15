@@ -117,12 +117,13 @@ static inline void s_proto_out_add( drs_proto_t * a_proto, drs_proto_data_t * a_
  */
 static inline void s_proto_out_remove(drs_proto_t * a_proto, drs_proto_data_t * a_out)
 {
+    dap_list_t * l_out_last_prev =  a_proto->out_last->prev;
     // Очищаем память элемента очереди
     dap_list_free1(a_proto->out_last);
     DAP_DELETE(a_out);
 
     // Обновляем указатели на последний и, если нужно, первый элемент очереди
-    a_proto->out_last = a_proto->out_last->prev;
+    a_proto->out_last = l_out_last_prev ;
     if ( a_proto->out_last == NULL)
         a_proto->out_first = NULL;
 }
@@ -156,16 +157,23 @@ static void s_callback_read (dap_events_socket_t * a_es,void * a_arg )
 
     l_cmd = *((uint32_t*) a_es->buf_in); // Читаем команду
 
-    size_t l_cmd_size = sizeof(uint32_t) + g_drs_proto_args_size[l_cmd];
+    if (l_cmd >= DRS_PROTO_CMD_MAX){
+            a_es->buf_in_size = 0; // Сбрасываем счетчик данных в буфере и считаем его целиком прочитаным
+            log_it(L_ERROR, "Unrecognized command 0x%08X", l_cmd);
+            return;
+    }
+
+    size_t l_cmd_size = sizeof(l_cmd) + g_drs_proto_args_size[l_cmd];
     if( a_es->buf_in_size < l_cmd_size )
         return; // вернёмся сюда тогда, когда клиент вышлет ещё данных
 
     l_cmd_args = (uint32_t*) (a_es->buf_in + sizeof(uint32_t)); // Тут наши аргументы команды
 
-    // сдвигаем буфер на l_cmd_size через memmove()
-    dap_events_socket_shrink_buf_in(a_es, l_cmd_size);
-
+    // исполняем команду
     drs_proto_cmd( a_es, (drs_proto_cmd_t) l_cmd, l_cmd_args);
+
+    // сдвигаем буфер на l_cmd_size через memmove()
+    dap_events_socket_shrink_buf_in(a_es, l_cmd_size );
 }
 
 /**

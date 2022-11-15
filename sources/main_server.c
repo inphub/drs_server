@@ -101,7 +101,7 @@ int main(int argc, const char **argv)
     dap_log_level_set( g_debug_mode ? L_DEBUG : L_NOTICE );
 
     // New event loop init
-    dap_events_init(l_thread_cnt, 0);
+    dap_events_init(l_thread_cnt, 3600*24*365);
     dap_events_start();
 
     g_server_enabled = dap_config_get_item_bool_default( g_config, "server", "enabled", false );
@@ -150,20 +150,18 @@ int main(int argc, const char **argv)
         int32_t l_port = dap_config_get_item_int32(g_config, "server", "listen_port_tcp");
 
         if( l_port > 0 ) {
-            dap_server_t *l_server = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
+            l_server = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
                                       (uint16_t) l_port, SERVER_TCP, NULL );
         } else
             log_it( L_WARNING, "Server is enabled but no port is defined" );
 
     }
 
-    // Инициализация DRS
-    init_mem();
 
-    /*if(drs_init(NULL) != 0){
+    if(drs_init() != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -12;
-    }*/
+    }
     drs_calibrate_init();
 
     // Инициализация протокола

@@ -20,6 +20,7 @@
 size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_REG_WRITE]           = 2 * sizeof(uint32_t),
     [CMD_REG_READ]            = 1 * sizeof(uint32_t),
+    [CMD_READ_MEM]            = 2 * sizeof(uint32_t),
 
     [CMD_PAGE_READ_DRS1]      = 1 * sizeof(uint32_t),
     [CMD_PAGE_READ_DRS2]      = 1 * sizeof(uint32_t),
@@ -96,6 +97,15 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             drs_proto_out_add_mem(DRS_PROTO(a_es),g_ini, sizeof(*g_ini));
         break;
 
+        case CMD_READ_MEM: {				// read data from module
+            uint32_t adr = a_cmd_args[0]; 	// start address in byte
+            uint32_t val = a_cmd_args[1]; 	// number of data in byte
+            drs_proto_out_add_mem(DRS_PROTO(a_es), data_map + adr - MEMORY_BASE, val);
+            //rbam = read_reg(adr  * 2);
+            log_it(L_DEBUG," read_mem: addrs=%p size=%lu\n", adr, val);
+        } break;
+
+
         case CMD_INI_FILE_WRITE: //write file ini
         case CMD_INI_WRITE: //write ini
             log_it(L_DEBUG, "write ini (size %zd)", a_es->buf_in_size);
@@ -163,8 +173,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             double * l_levels=(double *)(&a_cmd_args[5]);
             drs_calibrate_params_t l_params = {
                 .ampl = {
-                    .repeats = a_cmd_args[1],
-                    .N = a_cmd_args[4],
+                    .repeats = a_cmd_args[4],
+                    .N = a_cmd_args[1],
                 },
                 .time_global = {
                     .num_cycle = a_cmd_args[3]
@@ -243,7 +253,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             //setSizeSamples(1024);//Peter fix
             if((a_cmd_args[0]&1)==1){
                 log_it(L_DEBUG, "start amplitude calibrate\n");
-                l_value=calibrate_amplitude(&COEFF,calibLvl,a_cmd_args[1],shiftDAC,g_ini,a_cmd_args[4]+2)&1;
+                l_value=calibrate_amplitude(&COEFF,calibLvl,a_cmd_args[1],g_ini,a_cmd_args[4]+2, NULL)&1;
                 if(l_value==1){
                     log_it(L_DEBUG, "end amplitude calibrate");
                 }else{

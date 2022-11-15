@@ -328,6 +328,7 @@ static int s_server_run(dap_server_t * a_server, dap_events_socket_callbacks_t *
         a_server->es_listeners = dap_list_append(a_server->es_listeners, l_es);
         l_es->type = a_server->type == SERVER_TCP ? DESCRIPTOR_TYPE_SOCKET_LISTENING : DESCRIPTOR_TYPE_SOCKET_UDP;
         l_es->_inheritor = a_server;
+        l_es->worker = l_w;
         pthread_mutex_lock(&a_server->started_mutex);
         dap_worker_add_events_socket( l_es, l_w );
         pthread_cond_wait(&a_server->started_cond, &a_server->started_mutex);
@@ -396,8 +397,14 @@ static void s_es_server_accept(dap_events_socket_t *a_es, SOCKET a_remote_socket
         inet_ntop(AF_INET,&l_addr_remote,l_es_new->hostaddr,sizeof (l_addr_remote) );
     }
     log_it(L_INFO,"Connection accepted from %s (%s)", l_es_new->hostaddr, l_es_new->service );
+
+    l_es_new->last_time_active = time(NULL);
+    if (l_es_new->callbacks.new_callback)
+        l_es_new->callbacks.new_callback(l_es_new, NULL);
+    l_es_new->is_initalized = true;
+
     dap_worker_t *l_worker = dap_events_worker_get_auto();
-    if (l_worker->id == a_es->worker->id) {
+    if ( a_es->worker && l_worker->id == a_es->worker->id) {
 #ifdef DAP_OS_UNIX
 #if defined (SO_INCOMING_CPU)
         int l_cpu = l_worker->id;
@@ -405,10 +412,6 @@ static void s_es_server_accept(dap_events_socket_t *a_es, SOCKET a_remote_socket
 #endif
 #endif
         l_es_new->worker = l_worker;
-        l_es_new->last_time_active = time(NULL);
-        if (l_es_new->callbacks.new_callback)
-            l_es_new->callbacks.new_callback(l_es_new, NULL);
-        l_es_new->is_initalized = true;
         if (dap_worker_add_events_socket_unsafe(l_worker, l_es_new)) {
             log_it(L_CRITICAL, "Can't add event socket's handler to worker i/o poll mechanism with error %d", errno);
             return;
