@@ -786,7 +786,7 @@ char    *str_header;
                     if(l_cmd->overrides.log_cmd_call)
                         l_cmd->overrides.log_cmd_call(str_cmd);
                     else
-                        log_it(L_DEBUG, "execute command=%s", str_cmd);
+                        log_it(L_NOTICE, "execute command=%s", str_cmd);
                     // exec command
 
                     char **l_argv = dap_strsplit(str_cmd, ";", -1);

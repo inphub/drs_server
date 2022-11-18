@@ -66,7 +66,7 @@ int drs_cli_init()
                 "               [-min_N <Minimal N for time local calibration>]\n"
                 "\tRun calibration process for specified DRS number or for all channels if number is not specified\n"
                 "\n"
-                "calibrate check [-drs <DRS number>]\n"
+                "calibrate state [-drs <DRS number>]\n"
                 "\tCheck calibration status for specified DRS number or for all channels if number is not specified\n"
                 "\n"
                 "calibrate abort [-drs <DRS number>]\n"
@@ -208,8 +208,8 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
                 dap_string_t * l_reply = dap_string_new("");
                 dap_string_append_printf(l_reply,"Page read for DRS %d\n", l_drs_num);
                 drs_t * l_drs = &g_drs[l_drs_num];
-                drs_data_get(l_drs,tmasFast,0);
-                for (size_t t = 0; t < 1000; t++){
+                drs_data_get_all(l_drs, 0, tmasFast);
+                for (size_t t = 0; t < 1024; t++){
                     dap_string_append_printf(l_reply, "0x%04X ", tmasFast[t]);
                     if ( t % 30 == 0)
                         dap_string_append_printf(l_reply, "\n");
@@ -223,8 +223,8 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
                     memset(tmasFast, 0, sizeof(tmasFast));
                     dap_string_append_printf(l_reply,"Page read for DRS %d\n", n);
                     drs_t * l_drs = g_drs+ n;
-                    drs_data_get(l_drs,tmasFast,0);
-                    for (size_t t = 0; t < 1000; t++){
+                    drs_data_get_all(l_drs, 0, tmasFast);
+                    for (size_t t = 0; t < 1024; t++){
                         dap_string_append_printf(l_reply, "%04X ", tmasFast[t]);
                         if ( t % 30 == 0)
                             dap_string_append_printf(l_reply, "\n");
@@ -440,7 +440,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             }
 
             *a_str_reply = dap_string_free(l_reply, false);
-        }else if  (strcmp(a_argv[1], "progress") == 0 ){ // Subcommand "check"
+        }else if  (strcmp(a_argv[1], "state") == 0 ){ // Subcommand "check"
             dap_string_t * l_reply = dap_string_new("Check drs calibration progress:\n");
             if (l_drs_num == -1){ // Если не указан DRS канал, то фигачим все
                 for (int i = 0; i < DRS_COUNT; i++){
@@ -482,6 +482,18 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
     }
 }
 
+#define dap_string_append_array(a_reply, a_name, a_fmt, a_array )\
+    dap_string_append_printf(a_reply,"%s:{",a_name);\
+    for (size_t i = 0; i < (sizeof(a_array))/sizeof(a_array[0]); i++){\
+        dap_string_append_printf(a_reply, a_fmt, a_array[i]); \
+        if (i != (sizeof(a_array))/sizeof(a_array[0]) ) \
+            dap_string_append_printf(a_reply, ", "); \
+        if ( i % 16 == 0 ) \
+            dap_string_append_printf(a_reply, "\n"); \
+    } \
+    dap_string_append_printf(a_reply,"}\n");
+
+
 /**
  * @brief s_calibrate_state_print
  * @param a_reply
@@ -491,8 +503,23 @@ static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_c
 {
     pthread_rwlock_rdlock(&a_cal->rwlock);
     dap_string_append_printf( a_reply, "Running:     %s\n", a_cal->is_running? "yes" : "no" );
-    if (a_cal->is_running){
-        dap_string_append_printf( a_reply, "Progress:    %d%%\n", a_cal->progress );
+    dap_string_append_printf( a_reply, "Progress:    %d%%\n", a_cal->progress );
+    if (a_cal->ts_end){
+        coefficients_t * l_params = &a_cal->drs->coeffs;
+        dap_string_append_array(a_reply, "splash", "0x%08X", l_params->splash);
+        dap_string_append_array(a_reply, "deltaTimeRef", "%f", l_params->deltaTimeRef);
+        dap_string_append_array(a_reply, "chanK", "%f", l_params->chanK);
+        dap_string_append_array(a_reply, "chanB", "%f", l_params->chanB);
+        dap_string_append_array(a_reply, "kTime", "%f", l_params->kTime);
+        dap_string_append_array(a_reply, "k", "%f", l_params->k);
+        dap_string_append_array(a_reply, "b", "%f", l_params->b);
+        dap_string_append_array(a_reply, "k9", "%f", l_params->k9);
+        dap_string_append_array(a_reply, "b9", "%f", l_params->b9);
+        dap_string_append_printf( a_reply, "indicator=%d \n", l_params->indicator);
+        dap_string_append_printf( a_reply, "Got time:    %.3lf seconds \n",
+                                   ((long double) (a_cal->ts_end - a_cal->ts_start)) / 1000000000.0 );
+
+
     }
     pthread_rwlock_unlock(&a_cal->rwlock);
 }

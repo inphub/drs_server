@@ -33,6 +33,11 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_GET_SHIFT]           = 1 * sizeof(uint32_t),
     [CMD_START]               = 2 * sizeof(uint32_t),
     [CMD_READ_PAGE]           = 3 * sizeof(uint32_t),
+
+    [CMD_CALIBRATE_ABORT ]         = 1 * sizeof(uint32_t),
+    [CMD_CALIBRATE_RESULTS ]       = 1 * sizeof(uint32_t),
+    [CMD_CALIBRATE_RUN ]           = 1 * sizeof(uint32_t),
+    [CMD_CALIBRATE_PROGRESS ]      = 1 * sizeof(uint32_t),
 };
 
 #define MAX_PAGE_COUNT 1000
@@ -46,7 +51,7 @@ double ddata[16384] = {0};
 void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
     uint32_t l_addr = 0, l_value = 0;
-    log_it(L_DEBUG, "Proto cmd 0x%08X", a_cmd);
+    log_it(L_DEBUG, "---=== Proto cmd 0x%08X ===---", a_cmd);
     switch( a_cmd ) {
         case CMD_IDLE:
             log_it(L_NOTICE, "Client sent idle command, do nothing");
@@ -102,7 +107,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             uint32_t val = a_cmd_args[1]; 	// number of data in byte
             drs_proto_out_add_mem(DRS_PROTO(a_es), data_map + adr - MEMORY_BASE, val);
             //rbam = read_reg(adr  * 2);
-            log_it(L_DEBUG," read_mem: addrs=%p size=%lu\n", adr, val);
+            log_it(L_DEBUG," read_mem: addrs=0x%08X size=%u\n", adr, val);
         } break;
 
 
@@ -154,7 +159,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
         }break;
 
 
-        case CMD_CALIBRATE_RUN:{/*
+        case CMD_CALIBRATE_RUN:{/**
             calibrate
 
             a_cmd_args[0] - ключи калибровки, 1 бит амплитудная,2 локальная временная,3 глобальная временная
@@ -167,7 +172,9 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             при не нулевом значении, между  BegServ и EndServ будут включены count дополнительных уровней цапов для амплитудной калибровки
             с a_cmd_args[5] идет массив даблов, первые 2 элемента BegServ и EndServ
             остальные 8 сдвиги цапов
-            */
+
+            Возврат: 4 байта (int), 0 если всё хорошо, код ошибки, если нет
+              */
 
             // Подготавливаем параметры калибровки
             double * l_levels=(double *)(&a_cmd_args[5]);
@@ -202,12 +209,23 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             /*
              * a_cmd_arg[0]  - Номер проверяемой DRS
              *
-             * Возвращает код состояния от 0 до 1 либо -1 если калибровка уже не идёт
+             * Возвращает прогресс калибровки от 0 до 100 либо -1 если калибровка не проходила
              */
             int l_ret = drs_calibrate_progress( a_cmd_args[0]);
             dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
         }break;
-
+        case CMD_CALIBRATE_RESULTS :{
+            /*
+             * a_cmd_arg[0]  - Номер проверяемой DRS
+             *
+             * Возвращает коэфициенты, 327'764 байт ( sizeof(coefficients_t) )
+             * */
+            if(a_cmd_args[0]>= DRS_COUNT ){
+                log_it(L_ERROR, "Wrong drs number %u that should be smaller than %u", a_cmd_args[0], DRS_COUNT);
+                break;
+            }
+            drs_proto_out_add_mem(DRS_PROTO(a_es), &(g_drs+a_cmd_args[0])->coeffs, sizeof(g_drs->coeffs));
+        } break;
         case CMD_CALIBRATE_ABORT:{
             /*
              * a_cmd_arg[0]  - Номер проверяемой DRS
@@ -301,7 +319,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 //readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
             }
             for(size_t t=0;t<a_cmd_args[0];t++) {
-                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,&shift[t],&COEFF,1024,8,a_cmd_args[2],g_ini);
+                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,&shift[t],&COEFF,1024,2,a_cmd_args[2],g_ini);
                 log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){
@@ -427,7 +445,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 //                                		 readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
             }
             for(size_t t=0;t<a_cmd_args[0];t++){
-                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,shift,&COEFF,1024,4,a_cmd_args[2],g_ini);
+                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,shift,&COEFF,1024,2,a_cmd_args[2],g_ini);
                 log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){

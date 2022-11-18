@@ -35,6 +35,7 @@ typedef enum drs_proto_cmd{
     CMD_CALIBRATE_RUN      = 0x1B, // Calibrate run
     CMD_CALIBRATE_PROGRESS = 0x1C, // Calibrate check progess
     CMD_CALIBRATE_ABORT    = 0x1D, // Calibrate abort
+    CMD_CALIBRATE_RESULTS   = 0x1E, // Calibration results
 
     CMD_READ               = 0xC, // Read
     CMD_SHIFT_DAC_SET      = 0xD , // Set ShiftDAC
