@@ -31,7 +31,6 @@ typedef enum drs_proto_cmd{
     CMD_PAGE_READ_DRS1     = 0xA, //read N page data from DRS1
     CMD_PAGE_READ_DRS2     = 110, //read N page data from DRS1
 
-    CMD_CALIBRATE_OLD      = 0xB, // Old Calibrate
     CMD_CALIBRATE_RUN      = 0x1B, // Calibrate run
     CMD_CALIBRATE_PROGRESS = 0x1C, // Calibrate check progess
     CMD_CALIBRATE_ABORT    = 0x1D, // Calibrate abort

@@ -14,7 +14,7 @@
 #include "drs_ops.h"
 #include "drs_cli.h"
 #include "drs_data.h"
-#include "drs_calibrate.h"
+#include "drs_cal.h"
 
 #define LOG_TAG "drs_cli"
 
@@ -282,7 +282,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             unsigned l_min_N = 0;
             double l_begin = 0;
             double l_end = 0;
-            double l_shifts[DCA_COUNT] ={};
+            double l_shifts[DRS_DCA_COUNT_ALL] ={};
             unsigned l_repeats = 0;
             unsigned l_num_cycle = 0;
             unsigned l_N = 0;
@@ -317,7 +317,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 }
 
                 // Конвертируем смещения
-                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DCA_COUNT);
+                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DRS_DCA_COUNT_ALL);
                 if (l_shifts_strs == NULL){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts argument is empty");
                     return -22;
@@ -334,14 +334,14 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                     }
                     l_shifts[l_shifts_num] = l_shift;
                 }
-                if (l_shifts_num < DCA_COUNT){
+                if (l_shifts_num < DRS_DCA_COUNT_ALL){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too small, should be %u",
-                                                      l_shifts_num,DCA_COUNT);
+                                                      l_shifts_num,DRS_DCA_COUNT_ALL);
                     return -24;
                 }
-                if (l_shifts_num > DCA_COUNT){
+                if (l_shifts_num > DRS_DCA_COUNT_ALL){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too big, should be %u",
-                                                      l_shifts_num,DCA_COUNT);
+                                                      l_shifts_num,DRS_DCA_COUNT_ALL);
                     return -25;
                 }
 
@@ -418,7 +418,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             };
             l_params.ampl.levels[0] = l_begin;
             l_params.ampl.levels[1] = l_end;
-            memcpy(l_params.ampl.levels+2, l_shifts,sizeof (l_params.ampl.repeats)-2 *sizeof(double) );
+            memcpy(l_params.ampl.levels+2, l_shifts,sizeof (l_params.ampl.levels)-2 *sizeof(double) );
 
             dap_string_t * l_reply = dap_string_new("");
 
@@ -516,8 +516,8 @@ static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_c
         dap_string_append_array(a_reply, "k9", "%f", l_params->k9);
         dap_string_append_array(a_reply, "b9", "%f", l_params->b9);
         dap_string_append_printf( a_reply, "indicator=%d \n", l_params->indicator);
-        dap_string_append_printf( a_reply, "Got time:    %.3lf seconds \n",
-                                   ((long double) (a_cal->ts_end - a_cal->ts_start)) / 1000000000.0 );
+        dap_string_append_printf( a_reply, "Got time:    %.3f seconds \n",
+                                   ((double) (a_cal->ts_end - a_cal->ts_start)) / 1000000000.0 );
 
 
     }

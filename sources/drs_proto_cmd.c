@@ -12,7 +12,9 @@
 
 #include "commands.h"
 #include "calibrate.h"
-#include "drs_calibrate.h"
+#include "drs_cal.h"
+#include "drs_cal_amp.h"
+#include "drs_cal_time_global.h"
 #include "data_operations.h"
 
 #define LOG_TAG "drs_proto_cmd"
@@ -26,7 +28,6 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_PAGE_READ_DRS2]      = 1 * sizeof(uint32_t),
     [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
     [CMD_INI_WRITE]           = sizeof(*g_ini),
-    [CMD_CALIBRATE_OLD]           = 6 * sizeof(uint32_t),
     [CMD_READ]                = 3 * sizeof(uint32_t),
     [CMD_SHIFT_DAC_SET]       = 1 * sizeof(uint32_t),
     [CMD_FF]                  = 1 * sizeof(uint32_t),
@@ -139,7 +140,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
             size_t t;
             for (t=0; t<a_cmd_args[0]; t++) {
-                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_PAGE_SIZE]), 0x4000 );
+                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT]), 0x4000 );
             }
             if (t>0) t--;
             log_it( L_DEBUG, "read page %d data: [0]=0x%04x,[1]=0x%04x [2]=0x%04x,[3]=0x%04x [4]=0x%04x,[5]=0x%04x [6]=0x%04x,[7]=0x%04x\n", t, ((unsigned short *)data_map_drs1)[t*8192+0], ((unsigned short *)data_map_drs1)[t*8192+1], ((unsigned short *)data_map_drs1)[t*8192+2], ((unsigned short *)data_map_drs1)[t*8192+3], ((unsigned short *)data_map_drs1)[t*8192+4], ((unsigned short *)data_map_drs1)[t*8192+5], ((unsigned short *)data_map_drs1)[t*8192+6], ((unsigned short *)data_map_drs1)[t*8192+7]);
@@ -151,7 +152,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
             size_t t;
             for (t=0; t<a_cmd_args[0]; t++) {
-                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_PAGE_SIZE]), 0x4000 );
+                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT]), 0x4000 );
             }
             if (t>0) t--;
             log_it( L_DEBUG, "read page %d data: [0]=0x%04x,[1]=0x%04x [2]=0x%04x,[3]=0x%04x [4]=0x%04x,[5]=0x%04x [6]=0x%04x,[7]=0x%04x\n", t, ((unsigned short *)data_map_drs1)[t*8192+0], ((unsigned short *)data_map_drs1)[t*8192+1], ((unsigned short *)data_map_drs1)[t*8192+2], ((unsigned short *)data_map_drs1)[t*8192+3], ((unsigned short *)data_map_drs1)[t*8192+4], ((unsigned short *)data_map_drs1)[t*8192+5], ((unsigned short *)data_map_drs1)[t*8192+6], ((unsigned short *)data_map_drs1)[t*8192+7]);
@@ -236,69 +237,6 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
         }break;
 
-        case CMD_CALIBRATE_OLD:{         /*
-            calibrate
-
-            a_cmd_args[0] - ключи калибровки, 1 бит амплитудная,2 локальная временная,3 глобальная временная
-            a_cmd_args[1] - N c клиента, количество проходов аплитудной калибровки для каждого уровня цапов
-            a_cmd_args[2] - Min N с клиента, минимальное число набора статистики для каждой ячейки в локальной калибровке
-            a_cmd_args[3] - numCylce, число проходов в глобальной колибровке
-            a_cmd_args[4] - количество уровней у амплитудной калибровки count,
-            для каждого будет N(из a_cmd_args[2]) проходов,
-            при нуле будут выполняться два прохода для уровней BegServ и EndServ(о них ниже),
-            при не нулевом значении, между  BegServ и EndServ будут включены count дополнительных уровней цапов для амплитудной калибровки
-            с a_cmd_args[5] идет массив даблов, первые 2 элемента BegServ и EndServ
-            остальные 8 сдвиги цапов
-            */
-
-            double * calibLvl=(double *)(&a_cmd_args[5]);
-            double * shiftDAC=&calibLvl[2];
-            size_t t;
-            l_value=0;
-
-            for(t=0;t<6;t++){
-                log_it(L_DEBUG, "cmd_arg[%zd] = %u", t, a_cmd_args[t]);
-            }
-
-            for(t=0;t<2;t++){
-                log_it(L_DEBUG, "calibLvl[%zd] = %f", t, calibLvl[t]);
-            }
-
-            for(t=0;t<8;t++){
-                log_it(L_DEBUG, "shiftDAC[%zd] = %f", t, shiftDAC[t]);
-            }
-            setNumPages(1);
-            //setSizeSamples(1024);//Peter fix
-            if((a_cmd_args[0]&1)==1){
-                log_it(L_DEBUG, "start amplitude calibrate\n");
-                l_value=calibrate_amplitude(&COEFF,calibLvl,a_cmd_args[1],g_ini,a_cmd_args[4]+2, NULL)&1;
-                if(l_value==1){
-                    log_it(L_DEBUG, "end amplitude calibrate");
-                }else{
-                    log_it(L_DEBUG, "amplitude calibrate error");
-                }
-            }
-            if((a_cmd_args[0]&2)==2){
-                log_it(L_DEBUG, "start time calibrate");
-                l_value|=(calibrate_time(a_cmd_args[2],&COEFF,g_ini)<<1)&2;
-                if((l_value&2)==2){
-                    log_it(L_DEBUG, "end time calibrate");
-                }else{
-                    log_it(L_DEBUG, "time calibrate error");
-                }
-            }
-            if((a_cmd_args[0]&4)==4){
-                log_it(L_DEBUG, "start global time calibrate");
-                l_value|=(calibrate_time_global(a_cmd_args[3],&COEFF,g_ini)<<2)&4;
-                if((l_value&4)==4){
-                    log_it(L_DEBUG, "end global time calibrate");
-                }else{
-                    log_it(L_DEBUG, "global time calibrate error");
-                }
-            }
-            dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
-        }break;
-
         case CMD_READ:
             /*
             read
@@ -323,7 +261,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){
-                    calibrate_get_array_x(ddata,&shift[t],&COEFF,a_cmd_args[2]);
+                    drs_cal_get_array_x_old(ddata,&shift[t],&COEFF,a_cmd_args[2]);
                     memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
                 }
             }
@@ -337,8 +275,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             for(size_t t=0;t<4;t++){
             log_it(L_DEBUG, "%f",shiftDAC[t]);
             }
-            setShiftAllDac(shiftDAC,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
-            setDAC(1);
+            drs_dac_shift_set_all(shiftDAC,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+            drs_dac_set(1);
             l_value=1;
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
         }break;
@@ -449,7 +387,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
                 memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
                 if(l_value==8){
-                    calibrate_get_array_x(ddata,shift,&COEFF,a_cmd_args[2]);
+                    drs_cal_get_array_x_old(ddata,shift,&COEFF,a_cmd_args[2]);
                     memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
                 }
             }

@@ -40,7 +40,7 @@ typedef struct dap_config_internal
     dap_config_item_t * item_root;
     char * path;
 } dap_config_internal_t;
-#define DAP_CONFIG_INTERNAL(a) ( (dap_config_internal_t* ) a->_internal )
+#define PVT(a) ( (dap_config_internal_t* ) a->_internal )
 
 #define MAX_CONFIG_PATH 256
 static char s_configs_path[MAX_CONFIG_PATH] = "/opt/dap/etc";
@@ -99,6 +99,19 @@ static uint16_t get_array_length(const char* str) {
     }
     return array_length;
 }
+
+/**
+ * @brief dap_config_new
+ * @return
+ */
+dap_config_t * dap_config_new()
+{
+    dap_config_t * l_ret = DAP_NEW_Z(dap_config_t);
+    dap_config_internal_t * l_config_internal = DAP_NEW_Z(dap_config_internal_t);
+    l_ret->_internal = l_config_internal;
+    return l_ret;
+}
+
 /**
  * @brief dap_config_open Open the configuration settings
  * @param[in] a_name Configuration name
@@ -110,7 +123,7 @@ dap_config_t * dap_config_open(const char * a_name)
     if ( a_name ){
         log_it(L_DEBUG,"Looking for config name %s...",a_name);
         size_t l_config_path_size_max = strlen(a_name)+6+strlen(s_configs_path);
-        char *l_config_path = DAP_NEW_SIZE(char,l_config_path_size_max);
+        char *l_config_path = DAP_NEW_Z_SIZE(char,l_config_path_size_max);
         snprintf(l_config_path,l_config_path_size_max, "%s/%s.cfg",s_configs_path,a_name);
         l_ret = dap_config_load(l_config_path);
 //        DAP_DELETE(l_config_path);
@@ -118,6 +131,47 @@ dap_config_t * dap_config_open(const char * a_name)
         log_it(L_ERROR,"Config name is NULL");
     }
     return l_ret;
+}
+
+/**
+ * @brief dap_config_save
+ * @param a_cfg
+ * @param a_file_path
+ * @return
+ */
+int dap_config_save(dap_config_t * a_cfg, const char * a_file_path)
+{
+    assert(a_cfg);
+    assert(a_file_path);
+
+    FILE * l_file = fopen(a_file_path, "w");
+    if (l_file == NULL){
+        int l_errno = errno;
+        char l_err[255];
+        l_err[0] = '\0';
+        strerror_r(l_errno, l_err, sizeof (l_err));
+        log_it(L_ERROR, "Can't save config file: \"%s\" code %d", l_err, l_errno);
+        return -2;
+    }
+    for (dap_config_item_t * l_section = PVT(a_cfg)->item_root; l_section; l_section = l_section->item_next ){
+        fprintf(l_file, "[%s]\n",l_section->name);
+        for (dap_config_item_t * l_param = l_section->childs; l_param; l_param = l_param->item_next ){
+            fprintf(l_file, "%s=", l_param->name);
+            if( l_param->is_array ){
+                fprintf(l_file, "[");
+                for (uint16_t i = 0; i < l_param->array_length; i++){
+                    fprintf(l_file, "%s",l_param->data_str_array[i] );
+                    if ( i != l_param->array_length-1 )
+                        fprintf(l_file, ",");
+                }
+                fprintf(l_file, "]\n");
+            }else{
+                fprintf(l_file, "%s\n", l_param->data_str);
+            }
+        }
+    }
+    fclose(l_file);
+    return 0;
 }
 
 /**
@@ -136,10 +190,10 @@ dap_config_t * dap_config_load(const char * a_file_path)
         char buf[buf_len];
         fseek(f, 0L, SEEK_SET);
         log_it(L_DEBUG,"Opened config %s",a_file_path);
-        l_ret = DAP_NEW_Z(dap_config_t);
-        dap_config_internal_t * l_config_internal = DAP_NEW_Z(dap_config_internal_t);
-        l_config_internal->path = (char*)a_file_path;
-        l_ret->_internal = l_config_internal;
+        l_ret = dap_config_new();
+        dap_config_internal_t * l_config_pvt = PVT(l_ret);
+        l_config_pvt->path = strdup(a_file_path);
+
         size_t l_global_offset=0;
         size_t l_buf_size=0;
         size_t l_buf_pos_line_start=0;
@@ -185,8 +239,8 @@ dap_config_t * dap_config_load(const char * a_file_path)
 
                                     dap_config_item_t * l_item_section = DAP_NEW_Z(dap_config_item_t);
                                     strncpy(l_item_section->name,l_section_name,sizeof(l_item_section->name)-1);
-                                    l_item_section->item_next = l_config_internal->item_root;
-                                    l_config_internal->item_root = l_item_section;
+                                    l_item_section->item_next = l_config_pvt->item_root;
+                                    l_config_pvt->item_root = l_item_section;
                                     free(l_section_name);
 
                                     l_section_current = l_item_section;
@@ -316,10 +370,11 @@ dap_config_t * dap_config_load(const char * a_file_path)
  */
 void dap_config_close(dap_config_t * a_config)
 {
-    dap_config_item_t * l_item = DAP_CONFIG_INTERNAL(a_config)->item_root ;
+    dap_config_internal_t * l_config_pvt = PVT(a_config);
+    dap_config_item_t * l_item = l_config_pvt->item_root ;
     while(l_item) {
         dap_config_item_t * l_item_child = l_item->childs;
-        DAP_CONFIG_INTERNAL(a_config)->item_root = l_item->item_next;
+        PVT(a_config)->item_root = l_item->item_next;
 
         while(l_item_child) {
             l_item->childs = l_item_child->item_next;
@@ -338,12 +393,14 @@ void dap_config_close(dap_config_t * a_config)
             DAP_DELETE(l_item->data_str);
         }
         DAP_DELETE(l_item);
-        l_item = DAP_CONFIG_INTERNAL(a_config)->item_root;
+        l_item = l_config_pvt->item_root;
     }
 
-    free(DAP_CONFIG_INTERNAL(a_config)->path);
-    free(a_config->_internal);
-    free(a_config);
+    if (l_config_pvt->path)
+      DAP_DELETE(l_config_pvt->path);
+
+    DAP_DELETE(a_config->_internal);
+    DAP_DELETE(a_config);
 
 }
 
@@ -522,7 +579,7 @@ uint64_t dap_config_get_item_uint64_default(dap_config_t * a_config, const char 
  */
 static dap_config_item_t * dap_config_get_item(dap_config_t * a_config, const char * a_section_path, const char * a_item_name)
 {
-    dap_config_item_t * l_item_section = a_config? DAP_CONFIG_INTERNAL(a_config)->item_root: NULL ;
+    dap_config_item_t * l_item_section = a_config? PVT(a_config)->item_root: NULL ;
     while(l_item_section){
         if (strcmp(l_item_section->name,a_section_path)==0){
             dap_config_item_t * l_item = l_item_section->childs;
@@ -564,8 +621,8 @@ const char * dap_config_get_item_path(dap_config_t * a_config, const char * a_se
 {
     const char* raw_path = dap_config_get_item_str(a_config, a_section_path, a_item_name);
     if (!raw_path) return NULL;
-    char * res = dap_canonicalize_filename(raw_path, dap_path_get_dirname(DAP_CONFIG_INTERNAL(a_config)->path));
-    log_it(L_DEBUG, "Config-path item: '%s': composed from '%s' and '%s'", res, raw_path, dap_path_get_dirname(DAP_CONFIG_INTERNAL(a_config)->path));
+    char * res = dap_canonicalize_filename(raw_path, dap_path_get_dirname(PVT(a_config)->path));
+    log_it(L_DEBUG, "Config-path item: '%s': composed from '%s' and '%s'", res, raw_path, dap_path_get_dirname(PVT(a_config)->path));
     return res;
 }
 
@@ -615,7 +672,7 @@ char** dap_config_get_array_str(dap_config_t * a_config, const char * a_section_
  */
 const char * dap_config_get_item_str_default(dap_config_t * a_config, const char * a_section_path, const char * a_item_name, const char * a_value_default)
 {
-    dap_config_item_t * l_item_section =a_config? DAP_CONFIG_INTERNAL(a_config)->item_root: NULL ;
+    dap_config_item_t * l_item_section =a_config? PVT(a_config)->item_root: NULL ;
     while(l_item_section){
         if (strcmp(l_item_section->name,a_section_path)==0){
             dap_config_item_t * l_item = l_item_section->childs;
@@ -676,6 +733,36 @@ const char *l_str_ret;
 #endif
 
 }
+
+/**
+ * @brief dap_config_get_item_float Getting a configuration item as a floating-point value
+ * @param[in] a_config Configuration
+ * @param[in] a_section_path Path
+ * @param[in] a_item_name Setting
+ * @return
+ */
+float dap_config_get_item_float(dap_config_t * a_config, const char * a_section_path, const char * a_item_name)
+{
+const char *l_str_ret;
+
+    l_str_ret = dap_config_get_item_str(a_config,a_section_path,a_item_name);
+    return l_str_ret ? atof(l_str_ret) : 0.0;
+}
+
+/**
+ * @brief dap_config_get_item_float Getting a configuration item as a floating-point value
+ * @param[in] a_config Configuration
+ * @param[in] a_section_path Path
+ * @param[in] a_item_name Setting
+ * @param[in] a_default Defailt
+ * @return
+ */
+float dap_config_get_item_float_default(dap_config_t * a_config, const char * a_section_path, const char * a_item_name, double a_default)
+{
+    const char * l_str_ret = dap_config_get_item_str(a_config,a_section_path,a_item_name);
+    return l_str_ret?atof(l_str_ret):a_default;
+}
+
 
 /**
  * @brief dap_config_get_item_double Getting a configuration item as a floating-point value

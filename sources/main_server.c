@@ -11,7 +11,7 @@
 
 #include "drs_proto.h"
 #include "drs_cli.h"
-#include "drs_calibrate.h"
+#include "drs_cal.h"
 #include "drs.h"
 #include "sig_unix_handler.h"
 

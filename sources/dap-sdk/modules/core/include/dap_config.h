@@ -39,8 +39,11 @@ typedef struct dap_config{
 
 int dap_config_init(const char * a_configs_path);
 void dap_config_deinit();
+dap_config_t * dap_config_new();
+
 dap_config_t * dap_config_open(const char * a_name);
 dap_config_t * dap_config_load(const char * a_file_path);
+int dap_config_save(dap_config_t * a_cfg, const char * a_file_path);
 void dap_config_close(dap_config_t * a_config);
 
 const char * dap_config_path();
@@ -77,6 +80,9 @@ bool dap_config_get_item_bool_default(dap_config_t * a_config, const char * a_se
 
 double dap_config_get_item_double(dap_config_t * a_config, const char * a_section_path, const char * a_item_name);
 double dap_config_get_item_double_default(dap_config_t * a_config, const char * a_section_path, const char * a_item_name, double a_default);
+
+float dap_config_get_item_float(dap_config_t * a_config, const char * a_section_path, const char * a_item_name);
+float dap_config_get_item_float_default(dap_config_t * a_config, const char * a_section_path, const char * a_item_name, double a_default);
 
 extern dap_config_t * g_config;
 
