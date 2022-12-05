@@ -140,7 +140,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
             size_t t;
             for (t=0; t<a_cmd_args[0]; t++) {
-                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT]), 0x4000 );
+                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT_ALL]), 0x4000 );
             }
             if (t>0) t--;
             log_it( L_DEBUG, "read page %d data: [0]=0x%04x,[1]=0x%04x [2]=0x%04x,[3]=0x%04x [4]=0x%04x,[5]=0x%04x [6]=0x%04x,[7]=0x%04x\n", t, ((unsigned short *)data_map_drs1)[t*8192+0], ((unsigned short *)data_map_drs1)[t*8192+1], ((unsigned short *)data_map_drs1)[t*8192+2], ((unsigned short *)data_map_drs1)[t*8192+3], ((unsigned short *)data_map_drs1)[t*8192+4], ((unsigned short *)data_map_drs1)[t*8192+5], ((unsigned short *)data_map_drs1)[t*8192+6], ((unsigned short *)data_map_drs1)[t*8192+7]);
@@ -152,7 +152,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
             size_t t;
             for (t=0; t<a_cmd_args[0]; t++) {
-                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT]), 0x4000 );
+                drs_proto_out_add_mem(DRS_PROTO(a_es),&(((unsigned short *)data_map_drs1)[t*DRS_CELLS_COUNT_ALL]), 0x4000 );
             }
             if (t>0) t--;
             log_it( L_DEBUG, "read page %d data: [0]=0x%04x,[1]=0x%04x [2]=0x%04x,[3]=0x%04x [4]=0x%04x,[5]=0x%04x [6]=0x%04x,[7]=0x%04x\n", t, ((unsigned short *)data_map_drs1)[t*8192+0], ((unsigned short *)data_map_drs1)[t*8192+1], ((unsigned short *)data_map_drs1)[t*8192+2], ((unsigned short *)data_map_drs1)[t*8192+3], ((unsigned short *)data_map_drs1)[t*8192+4], ((unsigned short *)data_map_drs1)[t*8192+5], ((unsigned short *)data_map_drs1)[t*8192+6], ((unsigned short *)data_map_drs1)[t*8192+7]);
@@ -273,9 +273,11 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             //set shift DAC
             double *shiftDAC=(double *)(&a_cmd_args[0]);
             for(size_t t=0;t<4;t++){
-            log_it(L_DEBUG, "%f",shiftDAC[t]);
+              log_it(L_DEBUG, "%f",shiftDAC[t]);
             }
-            drs_dac_shift_set_all(shiftDAC,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+            for (int d = 0; d < DRS_COUNT; d++)
+              drs_dac_shift_set_all(d,&shiftDAC[d * DRS_DCA_COUNT] ,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+
             drs_dac_set(1);
             l_value=1;
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));

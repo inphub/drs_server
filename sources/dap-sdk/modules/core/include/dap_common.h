@@ -28,6 +28,9 @@
 #ifndef __STDC_WANT_LIB_EXT1__
 #define __STDC_WANT_LIB_EXT1__ 1
 #endif
+#ifndef __STDC_WANT_LIB_EXT1__
+#define __STDC_WANT_LIB_EXT1__ 2
+#endif
 #include <string.h>
 #include <stdarg.h>
 #include <stddef.h>
