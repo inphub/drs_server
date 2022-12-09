@@ -15,6 +15,9 @@
 #include "drs_cal.h"
 #include "drs_cal_amp.h"
 #include "drs_cal_time_global.h"
+#include "drs_ops.h"
+#include "drs_data.h"
+
 #include "data_operations.h"
 
 #define LOG_TAG "drs_proto_cmd"
@@ -37,7 +40,7 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 
     [CMD_CALIBRATE_ABORT ]         = 1 * sizeof(uint32_t),
     [CMD_CALIBRATE_RESULTS ]       = 1 * sizeof(uint32_t),
-    [CMD_CALIBRATE_RUN ]           = 1 * sizeof(uint32_t),
+    [CMD_CALIBRATE_RUN ]           = 7 * sizeof(uint32_t),
     [CMD_CALIBRATE_PROGRESS ]      = 1 * sizeof(uint32_t),
 };
 
@@ -46,8 +49,7 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 
 coefficients_t COEFF = {};
 uint32_t shift [DRS_COUNT * 1024] = {0};
-double ddata[16384] = {0};
-
+double ddata[DRS_CELLS_COUNT] = {0};
 
 void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
@@ -163,46 +165,49 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
         case CMD_CALIBRATE_RUN:{/**
             calibrate
 
-            a_cmd_args[0] - ключи калибровки, 1 бит амплитудная,2 локальная временная,3 глобальная временная
-            a_cmd_args[1] - N c клиента, количество проходов аплитудной калибровки для каждого уровня цапов
-            a_cmd_args[2] - Min N с клиента, минимальное число набора статистики для каждой ячейки в локальной калибровке
-            a_cmd_args[3] - numCylce, число проходов в глобальной колибровке
-            a_cmd_args[4] - количество уровней у амплитудной калибровки count,
+            a_cmd_args[0] - Номер DRS
+            a_cmd_args[1] - ключи калибровки, 1 бит амплитудная,2 локальная временная,3 глобальная временная
+            a_cmd_args[2] - N c клиента, количество проходов аплитудной калибровки для каждого уровня цапов
+            a_cmd_args[3] - Min N с клиента, минимальное число набора статистики для каждой ячейки в локальной калибровке
+            a_cmd_args[4] - numCylce, число проходов в глобальной колибровке
+            a_cmd_args[5] - количество уровней у амплитудной калибровки count,
             для каждого будет N(из a_cmd_args[2]) проходов,
             при нуле будут выполняться два прохода для уровней BegServ и EndServ(о них ниже),
             при не нулевом значении, между  BegServ и EndServ будут включены count дополнительных уровней цапов для амплитудной калибровки
-            с a_cmd_args[5] идет массив даблов, первые 2 элемента BegServ и EndServ
+            с a_cmd_args[6] идет массив даблов, первые 2 элемента BegServ и EndServ
             остальные 8 сдвиги цапов
 
             Возврат: 4 байта (int), 0 если всё хорошо, код ошибки, если нет
               */
 
+            int l_drs_num = a_cmd_args[0];
+
             // Подготавливаем параметры калибровки
-            double * l_levels=(double *)(&a_cmd_args[5]);
+            double * l_levels=(double *)(&a_cmd_args[6]);
             drs_calibrate_params_t l_params = {
                 .ampl = {
-                    .repeats = a_cmd_args[4],
-                    .N = a_cmd_args[1],
+                    .repeats = a_cmd_args[5],
+                    .N = a_cmd_args[2],
                 },
                 .time_global = {
-                    .num_cycle = a_cmd_args[3]
+                    .num_cycle = a_cmd_args[4]
                 },
                 .time_local = {
-                    .min_N = a_cmd_args[2]
+                    .min_N = a_cmd_args[3]
                 }
             };
             memcpy(l_params.ampl.levels, l_levels,sizeof (l_params.ampl.levels) );
 
             // Подготавливаем флаги
             uint32_t l_flags = 0;
-            if ( a_cmd_args[0] & 1)
+            if ( a_cmd_args[1] & 1)
                 l_flags |= DRS_CAL_FLAG_AMPL;
-            if ( a_cmd_args[0] & 2)
+            if ( a_cmd_args[1] & 2)
                 l_flags |= DRS_CAL_FLAG_TIME_LOCAL;
-            if ( a_cmd_args[0] & 4)
+            if ( a_cmd_args[1] & 4)
                 l_flags |= DRS_CAL_FLAG_TIME_GLOBAL;
 
-            int l_ret = drs_calibrate_run(-1,l_flags, &l_params);
+            int l_ret = drs_calibrate_run(l_drs_num,l_flags, &l_params);
             dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
         }break;
 
@@ -237,37 +242,42 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             dap_events_socket_write_unsafe(a_es, &l_ret, sizeof(l_ret));
         }break;
 
-        case CMD_READ:
+        case CMD_READ:{
             /*
             read
-            a_cmd_args[0]- число страниц для чтения
-            a_cmd_args[1]- флаг для soft start
-            a_cmd_args[2]- флаг для передачи массивов X
+            a_cmd_args[0]- номер DRS
+            a_cmd_args[1]- число страниц для чтения
+            a_cmd_args[2]- флаг для soft start
+            a_cmd_args[3]- флаг для передачи массивов X
             */
-            l_value=4*(1+((a_cmd_args[2]&24)!=0));
-            log_it(L_DEBUG, "Npage %u",a_cmd_args[0]);
-            log_it(L_DEBUG, "soft start %u",a_cmd_args[1]);
-            if((a_cmd_args[1]&1)==1){//soft start
-                setNumPages(1);
-                //setSizeSamples(1024);//Peter fix
-                onceGet(&tmasFast[0],&shift[0],0,0,0);
-                //onceGet(&tmasFast[8192],&shift[1024],0,0,1);
-            }else{
-                readNPages(&tmasFast[0],shift,a_cmd_args[0], l_value*16384, 0);//8192
-                //readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
+            int a_drs_num = a_cmd_args[0];
+            if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
+                log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
+                break;
             }
-            for(size_t t=0;t<a_cmd_args[0];t++) {
-                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,&shift[t],&COEFF,1024,2,a_cmd_args[2],g_ini);
-                log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
-                memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
+            drs_t * l_drs = g_drs + a_drs_num;
+
+            l_value=4*(1+((a_cmd_args[3]&24)!=0));
+            log_it(L_DEBUG, "Npage %u",a_cmd_args[1]);
+            log_it(L_DEBUG, "soft start 0x%08X",a_cmd_args[2]);
+            log_it(L_DEBUG, "apply flags 0x%08X",a_cmd_args[3]);
+            if((a_cmd_args[1]&1)==1 || true){//soft start
+
+                drs_set_num_pages(l_drs, 1);
+                //setSizeSamples(1024);//Peter fix
+                drs_data_get_all( l_drs, 0, tmasFast);
+            }else{
+                drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
+            }
+            for(size_t t=0;t<a_cmd_args[1];t++) {
+                drs_cal_ampl_apply(l_drs, tmasFast, ddata, a_cmd_args[3]);
                 if(l_value==8){
-                    drs_cal_get_array_x_old(ddata,&shift[t],&COEFF,a_cmd_args[2]);
-                    memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
+                    drs_cal_get_array_x(l_drs, ddata, a_cmd_args[3]);
                 }
             }
-            log_it(L_DEBUG, "buferSize=%u",2*8192*a_cmd_args[0]*l_value);
-            drs_proto_out_add_mem(DRS_PROTO(a_es), tmasFast,2*8192*a_cmd_args[0]*l_value);
-        break;
+            log_it( L_DEBUG, "ddata[0]=%f,ddata[1]=%f,ddata[2]=%f", ddata[0],ddata[1],ddata[2]);
+            drs_proto_out_add_mem(DRS_PROTO(a_es), ddata,  sizeof(ddata) );
+        }break;
 
         case CMD_SHIFT_DAC_SET:{
             //set shift DAC
@@ -276,7 +286,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
               log_it(L_DEBUG, "%f",shiftDAC[t]);
             }
             for (int d = 0; d < DRS_COUNT; d++)
-              drs_dac_shift_set_all(d,&shiftDAC[d * DRS_DCA_COUNT] ,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+              drs_dac_shift_set_all(d,&shiftDAC[d * DRS_DAC_COUNT] ,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
 
             drs_dac_set(1);
             l_value=1;
@@ -289,11 +299,17 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
         break;
 
-        case CMD_GET_SHIFT:
+        case CMD_GET_SHIFT:{
             //получение массива сдвигов ячеек
             //memcpy(tmasFast,shift,sizeof(unsigned int)*a_cmd_args[0]);
-            dap_events_socket_write_unsafe(a_es, &shift, sizeof(unsigned int)*a_cmd_args[0]);
-        break;
+            int a_drs_num = a_cmd_args[0];
+            if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
+                log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
+                break;
+            }
+            drs_t * l_drs = g_drs + a_drs_num;
+            dap_events_socket_write_unsafe(a_es, &l_drs->shift, sizeof(l_drs->shift));
+        }break;
 
         case CMD_START:
             //старт

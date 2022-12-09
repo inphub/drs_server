@@ -25,7 +25,7 @@ static int s_callback_calibrate(int argc, char ** argv, char **str_reply);
 static int s_callback_help(int argc, char ** argv, char **str_reply);
 static int s_callback_exit(int argc, char ** argv, char **str_reply);
 
-static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_state );
+static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_state,unsigned a_limits, int a_flags );
 static int s_parse_drs_and_check(int a_arg_index, int a_argc, char ** a_argv, char **a_str_reply);
 
 
@@ -66,8 +66,9 @@ int drs_cli_init()
                 "               [-min_N <Minimal N for time local calibration>]\n"
                 "\tRun calibration process for specified DRS number or for all channels if number is not specified\n"
                 "\n"
-                "calibrate state [-drs <DRS number>]\n"
+                "calibrate state [-drs <DRS number>] [-coeffs <SPLASH,DELTA_TIME,CHAN_K,CHAN_B,K_TIME,K,B,K9,B9>| ALL] [-limit <Array print limits>]\n"
                 "\tCheck calibration status for specified DRS number or for all channels if number is not specified\n"
+                ""
                 "\n"
                 "calibrate abort [-drs <DRS number>]\n"
                 "\tAbort calibration specified DRS number or for all channels if number is not specified\n"
@@ -158,7 +159,15 @@ static int s_callback_start(int a_argc, char ** a_argv, char **a_str_reply)
     if (l_drs_num < -1 ) // Wrong DRS num
         return -1;
 
+    double l_shifts[DRS_DAC_COUNT]={30000,30000};
+    float l_gains[DRS_DAC_COUNT]= {g_ini->fastadc.dac_gains[l_drs_num*DRS_COUNT],
+                                   g_ini->fastadc.dac_gains[l_drs_num*DRS_COUNT + 1]};
+    float l_offsets[DRS_DAC_COUNT]={g_ini->fastadc.dac_offsets[l_drs_num*DRS_COUNT],
+                                    g_ini->fastadc.dac_offsets[l_drs_num*DRS_COUNT + 1]};
+
+    drs_dac_shift_set_all(l_drs_num, l_shifts,l_gains, l_offsets );
     drs_start(l_drs_num);
+
     if (l_drs_num == -1)
         dap_cli_server_cmd_set_reply_text(a_str_reply,"DRS started all" );
     else
@@ -442,16 +451,61 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             *a_str_reply = dap_string_free(l_reply, false);
         }else if  (strcmp(a_argv[1], "state") == 0 ){ // Subcommand "check"
             dap_string_t * l_reply = dap_string_new("Check drs calibration progress:\n");
+            const char * l_coeffs_str = NULL;
+            const char * l_limits_str = NULL;
+            int l_coeffs_flags = 0;
+            unsigned l_limits = 0;
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-coeffs",  &l_coeffs_str);
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-limits",  &l_limits_str);
+
+            if (l_limits_str)
+              l_limits = atoi(l_limits_str);
+
+            if ( l_coeffs_str == NULL || dap_strcmp( l_coeffs_str, "ALL") == 0){
+                log_it(L_DEBUG, "Coeffs: ALL");
+                l_coeffs_flags = DRS_COEF_SPLASH |  DRS_COEF_DELTA_TIME | DRS_COEF_CHAN_K | DRS_COEF_CHAN_B |
+                                 DRS_COEF_K_TIME | DRS_COEF_K | DRS_COEF_B | DRS_COEF_K9 | DRS_COEF_B9;
+            }else{
+                log_it(L_DEBUG, "Coeffs: %s",l_coeffs_str);
+                char ** l_coeffs_strs = dap_strsplit(l_coeffs_str, ",",10);
+                if(l_coeffs_strs){
+                    for (size_t i = 0; l_coeffs_strs[i]; i ++){
+                        if( dap_strcmp(l_coeffs_strs[i], "SPLASH") == 0 )
+                            l_coeffs_flags |= DRS_COEF_SPLASH;
+                        else if( dap_strcmp(l_coeffs_strs[i], "DELTA_TIME") == 0 )
+                            l_coeffs_flags |= DRS_COEF_DELTA_TIME;
+                        else if( dap_strcmp(l_coeffs_strs[i], "CHAN_K") == 0 )
+                            l_coeffs_flags |= DRS_COEF_CHAN_K;
+                        else if( dap_strcmp(l_coeffs_strs[i], "CHAN_B") == 0 )
+                            l_coeffs_flags |= DRS_COEF_CHAN_B;
+                        else if( dap_strcmp(l_coeffs_strs[i], "K_TIME") == 0 )
+                            l_coeffs_flags |= DRS_COEF_K_TIME;
+                        else if( dap_strcmp(l_coeffs_strs[i], "K") == 0 )
+                            l_coeffs_flags |= DRS_COEF_K;
+                        else if( dap_strcmp(l_coeffs_strs[i], "B") == 0 )
+                            l_coeffs_flags |= DRS_COEF_B;
+                        else if( dap_strcmp(l_coeffs_strs[i], "K9") == 0 )
+                            l_coeffs_flags |= DRS_COEF_K9;
+                        else if( dap_strcmp(l_coeffs_strs[i], "B9") == 0 )
+                            l_coeffs_flags |= DRS_COEF_B9;
+                        else {
+                            log_it(L_ERROR, "Unknown flag %s", l_coeffs_strs[i]);
+                        }
+                        DAP_DELETE(l_coeffs_strs[i]);
+                    }
+                    DAP_DELETE(l_coeffs_strs);
+                }
+            }
             if (l_drs_num == -1){ // Если не указан DRS канал, то фигачим все
                 for (int i = 0; i < DRS_COUNT; i++){
                     drs_calibrate_t *l_cal = drs_calibrate_get_state(i);
                     dap_string_append_printf(l_reply, "--== DRS %d ==--\n", i);
-                    s_calibrate_state_print(l_reply, l_cal);
+                    s_calibrate_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
                 }
             }else{ // Если указан, то только конкретный
                 drs_calibrate_t * l_cal = drs_calibrate_get_state(l_drs_num);
                 dap_string_append_printf(l_reply, "--== DRS %d ==--\n", l_drs_num);
-                s_calibrate_state_print(l_reply, l_cal);
+                s_calibrate_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
             }
             *a_str_reply = dap_string_free(l_reply, false);
         } else if ( dap_strcmp( a_argv[1], "abort") == 0){
@@ -482,39 +536,64 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
     }
 }
 
-#define dap_string_append_array(a_reply, a_name, a_fmt, a_array )\
-    dap_string_append_printf(a_reply,"%s:{",a_name);\
-    for (size_t i = 0; i < (sizeof(a_array))/sizeof(a_array[0]); i++){\
-        dap_string_append_printf(a_reply, a_fmt, a_array[i]); \
-        if (i != (sizeof(a_array))/sizeof(a_array[0]) ) \
-            dap_string_append_printf(a_reply, ", "); \
-        if ( i % 16 == 0 ) \
-            dap_string_append_printf(a_reply, "\n"); \
-    } \
-    dap_string_append_printf(a_reply,"}\n");
+#define dap_string_append_array(a_reply, a_name, a_fmt, a_array, a_limits )\
+    {\
+        size_t l_array_count = (sizeof(a_array))/sizeof(a_array[0]); \
+        size_t l_limit = a_limits == 0 || a_limits > l_array_count ? l_array_count  : a_limits; \
+        dap_string_append_printf(a_reply,"%s:{",a_name);\
+        for (size_t i = 0; i < l_limit ; i++){\
+            dap_string_append_printf(a_reply, a_fmt, a_array[i]); \
+            if (i != l_limit-1 ) \
+                dap_string_append_printf(a_reply, ", "); \
+            if ( i && i % 16 == 0 ) \
+                dap_string_append_printf(a_reply, "\n"); \
+        } \
+        dap_string_append_printf(a_reply,"}\n");\
+    }
 
 
 /**
  * @brief s_calibrate_state_print
  * @param a_reply
  * @param a_cal
+ * @param a_limits
+ * @param a_flags
  */
-static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_cal)
+static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_cal, unsigned a_limits, int a_flags)
 {
     pthread_rwlock_rdlock(&a_cal->rwlock);
     dap_string_append_printf( a_reply, "Running:     %s\n", a_cal->is_running? "yes" : "no" );
     dap_string_append_printf( a_reply, "Progress:    %d%%\n", a_cal->progress );
     if (a_cal->ts_end){
         coefficients_t * l_params = &a_cal->drs->coeffs;
-        dap_string_append_array(a_reply, "splash", "0x%08X", l_params->splash);
-        dap_string_append_array(a_reply, "deltaTimeRef", "%f", l_params->deltaTimeRef);
-        dap_string_append_array(a_reply, "chanK", "%f", l_params->chanK);
-        dap_string_append_array(a_reply, "chanB", "%f", l_params->chanB);
-        dap_string_append_array(a_reply, "kTime", "%f", l_params->kTime);
-        dap_string_append_array(a_reply, "k", "%f", l_params->k);
-        dap_string_append_array(a_reply, "b", "%f", l_params->b);
-        dap_string_append_array(a_reply, "k9", "%f", l_params->k9);
-        dap_string_append_array(a_reply, "b9", "%f", l_params->b9);
+        if ( a_flags & DRS_COEF_SPLASH)
+            dap_string_append_array(a_reply, "splash", "0x%08X", l_params->splash, a_limits);
+
+
+        if ( a_flags & DRS_COEF_DELTA_TIME )
+            dap_string_append_array(a_reply, "deltaTimeRef", "%f", l_params->deltaTimeRef, a_limits);
+
+        if ( a_flags & DRS_COEF_CHAN_K )
+            dap_string_append_array(a_reply, "chanK", "%f", l_params->chanK, a_limits);
+
+        if ( a_flags & DRS_COEF_CHAN_B )
+            dap_string_append_array(a_reply, "chanB", "%f", l_params->chanB, a_limits);
+
+        if ( a_flags & DRS_COEF_K_TIME )
+            dap_string_append_array(a_reply, "kTime", "%f", l_params->kTime, a_limits);
+
+        if ( a_flags & DRS_COEF_K )
+            dap_string_append_array(a_reply, "k", "%f", l_params->k, a_limits);
+
+        if ( a_flags & DRS_COEF_B )
+            dap_string_append_array(a_reply, "b", "%f", l_params->b, a_limits);
+
+        if ( a_flags & DRS_COEF_K9 )
+            dap_string_append_array(a_reply, "k9", "%f", l_params->k9, a_limits);
+
+        if ( a_flags & DRS_COEF_B9 )
+            dap_string_append_array(a_reply, "b9", "%f", l_params->b9, a_limits);
+
         dap_string_append_printf( a_reply, "indicator=%d \n", l_params->indicator);
         dap_string_append_printf( a_reply, "Got time:    %.3f seconds \n",
                                    ((double) (a_cal->ts_end - a_cal->ts_start)) / 1000000000.0 );

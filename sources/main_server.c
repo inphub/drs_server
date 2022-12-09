@@ -42,19 +42,19 @@ int main(int argc, const char **argv)
     g_sys_dir_path = dap_strdup_printf("/opt/%s", dap_get_appname());
 
     // Путь к логам, если его нет, то создаёт его
-    char *l_log_dir = dap_strdup_printf("%s/var/log", g_sys_dir_path);
-    dap_mkdir_with_parents(l_log_dir);
-    char * l_log_file = dap_strdup_printf( "%s/%s.log", l_log_dir, dap_get_appname());
+    // char *l_log_dir = dap_strdup_printf("%s/var/log", g_sys_dir_path);
+    //dap_mkdir_with_parents(l_log_dir);
+    //char * l_log_file = dap_strdup_printf( "%s/%s.log", l_log_dir, dap_get_appname());
 
     // Инициализирует core модуль DAP SDK
-    if (dap_common_init(dap_get_appname(), l_log_file, l_log_dir) != 0) {
+    if (dap_common_init(dap_get_appname(), NULL, NULL) != 0) {
         printf("Fatal Error: Can't init common functions module");
         return -2;
     }
 
     // удаляем и обнуляем неиспользуемые переменные
-    DAP_DEL_Z(l_log_dir);
-    DAP_DEL_Z(l_log_file);
+    //DAP_DEL_Z(l_log_dir);
+    //DAP_DEL_Z(l_log_file);
 
     // Инициализируем работу с конфигами
     char l_config_dir[MAX_PATH];
