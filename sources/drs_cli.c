@@ -212,13 +212,20 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
                 dap_cli_server_cmd_set_reply_text( a_str_reply, "DRS #%d is %s", l_flag_ready? "ready": "not ready");
         }break;
         case CMD_PAGE:{
+            const char * l_limits_str;
+            size_t l_limits = DRS_CELLS_COUNT;
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-limit",  &l_limits_str);
+
+            if (l_limits_str)
+                l_limits = atoi(l_limits_str);
+
             if(l_drs_num!=-1){
                 memset(tmasFast, 0, sizeof(tmasFast));
                 dap_string_t * l_reply = dap_string_new("");
                 dap_string_append_printf(l_reply,"Page read for DRS %d\n", l_drs_num);
                 drs_t * l_drs = &g_drs[l_drs_num];
                 drs_data_get_all(l_drs, 0, tmasFast);
-                for (size_t t = 0; t < 1024; t++){
+                for (size_t t = 0; t < l_limits; t++){
                     dap_string_append_printf(l_reply, "0x%04X ", tmasFast[t]);
                     if ( t % 30 == 0)
                         dap_string_append_printf(l_reply, "\n");
@@ -233,7 +240,7 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
                     dap_string_append_printf(l_reply,"Page read for DRS %d\n", n);
                     drs_t * l_drs = g_drs+ n;
                     drs_data_get_all(l_drs, 0, tmasFast);
-                    for (size_t t = 0; t < 1024; t++){
+                    for (size_t t = 0; t < l_limits; t++){
                         dap_string_append_printf(l_reply, "%04X ", tmasFast[t]);
                         if ( t % 30 == 0)
                             dap_string_append_printf(l_reply, "\n");
@@ -326,7 +333,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 }
 
                 // Конвертируем смещения
-                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DRS_DCA_COUNT_ALL);
+                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DRS_CHANNELS_COUNT);
                 if (l_shifts_strs == NULL){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts argument is empty");
                     return -22;
@@ -343,14 +350,14 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                     }
                     l_shifts[l_shifts_num] = l_shift;
                 }
-                if (l_shifts_num < DRS_DCA_COUNT_ALL){
+                if (l_shifts_num < DRS_CHANNELS_COUNT){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too small, should be %u",
-                                                      l_shifts_num,DRS_DCA_COUNT_ALL);
+                                                      l_shifts_num,DRS_CHANNELS_COUNT);
                     return -24;
                 }
-                if (l_shifts_num > DRS_DCA_COUNT_ALL){
+                if (l_shifts_num > DRS_CHANNELS_COUNT){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too big, should be %u",
-                                                      l_shifts_num,DRS_DCA_COUNT_ALL);
+                                                      l_shifts_num,DRS_CHANNELS_COUNT);
                     return -25;
                 }
 
@@ -582,11 +589,21 @@ static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_c
         if ( a_flags & DRS_COEF_K_TIME )
             dap_string_append_array(a_reply, "kTime", "%f", l_params->kTime, a_limits);
 
-        if ( a_flags & DRS_COEF_K )
-            dap_string_append_array(a_reply, "k", "%f", l_params->k, a_limits);
+        if ( a_flags & DRS_COEF_K ){
+            char l_str[128];
+            for(unsigned c = 0; c< DRS_CHANNELS_COUNT; c++){
+                snprintf(l_str, sizeof(l_str),"k[%u]", c);
+                dap_string_append_array(a_reply, l_str, "%f", l_params->k[c], a_limits);
+            }
+        }
 
-        if ( a_flags & DRS_COEF_B )
-            dap_string_append_array(a_reply, "b", "%f", l_params->b, a_limits);
+        if ( a_flags & DRS_COEF_B ){
+            char l_str[128];
+            for(unsigned c = 0; c< DRS_CHANNELS_COUNT; c++){
+                snprintf(l_str, sizeof(l_str),"b[%u]", c);
+                dap_string_append_array(a_reply, l_str, "%f", l_params->b[c], a_limits);
+            }
+        }
 
         if ( a_flags & DRS_COEF_K9 )
             dap_string_append_array(a_reply, "k9", "%f", l_params->k9, a_limits);

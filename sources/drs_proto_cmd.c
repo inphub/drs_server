@@ -31,12 +31,11 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_PAGE_READ_DRS2]      = 1 * sizeof(uint32_t),
     [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
     [CMD_INI_WRITE]           = sizeof(*g_ini),
-    [CMD_READ]                = 3 * sizeof(uint32_t),
+    [CMD_READ]                = 4 * sizeof(uint32_t),
     [CMD_SHIFT_DAC_SET]       = 1 * sizeof(uint32_t),
     [CMD_FF]                  = 1 * sizeof(uint32_t),
     [CMD_GET_SHIFT]           = 1 * sizeof(uint32_t),
-    [CMD_START]               = 2 * sizeof(uint32_t),
-    [CMD_READ_PAGE]           = 3 * sizeof(uint32_t),
+    [CMD_START]               = 3 * sizeof(uint32_t),
 
     [CMD_CALIBRATE_ABORT ]         = 1 * sizeof(uint32_t),
     [CMD_CALIBRATE_RESULTS ]       = 1 * sizeof(uint32_t),
@@ -269,12 +268,16 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }else{
                 drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
             }
-            for(size_t t=0;t<a_cmd_args[1];t++) {
-                drs_cal_ampl_apply(l_drs, tmasFast, ddata, a_cmd_args[3]);
-                if(l_value==8){
-                    drs_cal_get_array_x(l_drs, ddata, a_cmd_args[3]);
-                }
+            //for(size_t t=0;t<a_cmd_args[1];t++) {
+            drs_cal_ampl_apply(l_drs, tmasFast, ddata, a_cmd_args[3]);
+            if(l_value==8){
+                log_it(L_NOTICE, "Apply another calibrations");
+                drs_cal_get_array_x(l_drs, ddata, a_cmd_args[3]);
             }
+            //}
+            /*for(size_t c=0;c<DRS_CELLS_COUNT ;c++) {
+                ddata[c] = c;
+            }*/
             log_it( L_DEBUG, "ddata[0]=%f,ddata[1]=%f,ddata[2]=%f", ddata[0],ddata[1],ddata[2]);
             drs_proto_out_add_mem(DRS_PROTO(a_es), ddata,  sizeof(ddata) );
         }break;
@@ -311,20 +314,27 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             dap_events_socket_write_unsafe(a_es, &l_drs->shift, sizeof(l_drs->shift));
         }break;
 
-        case CMD_START:
+        case CMD_START:{
+            int l_drs_num = a_cmd_args[0];
+            if(l_drs_num <0 || l_drs_num >=DRS_COUNT){
+                log_it(L_ERROR, "Can't get DRS #%d", l_drs_num);
+                break;
+            }
+            drs_t * l_drs = g_drs + l_drs_num;
             //старт
-            //a_cmd_args[0]- mode
+            // a_cmd_args[0] - DRS num
+            //a_cmd_args[1]- mode
             //		00 - page mode and read (N page)
             //		01 - soft start and read (one page)
             //		02 - only read
             //		04 - external start and read (one page)
-            //a_cmd_args[1] - pages
-            switch(a_cmd_args[0]){
+            //a_cmd_args[2] - pages
+            switch(a_cmd_args[1]){
                 case 0: //00 - page mode and read (N page)
-                    setNumPages(a_cmd_args[1]);
-                    log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000025, a_cmd_args[1]);
-                    setSizeSamples(a_cmd_args[1]*1024);
-                    log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000019, a_cmd_args[1]*1024);
+                    drs_set_num_pages(l_drs, a_cmd_args[2]);
+                    log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000025, a_cmd_args[2]);
+                    setSizeSamples(a_cmd_args[2]*1024);
+                    log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000019, a_cmd_args[2]*1024);
                     write_reg(0x00000015, 1<<1);  //page mode
                     log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000015, 1<<1);
                     usleep(100);
@@ -333,9 +343,11 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 break;
                 case 1: //01 - soft start and read (one page)
                     log_it(L_DEBUG, "01 - soft start and read (one page)\n");
-                    write_reg(0x00000015, 0);  //page mode disable
-                    write_reg(0x00000027, 0);  //external disable
-                    usleep(100);
+                    drs_set_sinus_signal(true);
+                    drs_set_mode(l_drs_num, MODE_SOFT_START);
+                    drs_start(l_drs_num);
+                    //write_reg(0x00000015, 0);  //page mode disable
+
                     /*                                       	 write_reg(0x00000025, 1);   	//pages
                     log_it(L_DEBUG, "write: adr=0x%08x, val=0x%08x\n", 0x00000025, 1);
                     write_reg(0x00000019, 1024);  //size samples
@@ -351,7 +363,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
                 case 4: //04 - external start and read (one page)
                     printf("04 - external start and read");
-                    setNumPages(1);
+                    drs_set_num_pages(l_drs, a_cmd_args[2]);
                     printf("write: adr=0x%08x, val=0x%08x\n", 0x00000025, 1), fflush(stdout);
                     setSizeSamples(1024);
                     printf("write: adr=0x%08x, val=0x%08x\n", 0x00000019, 1024), fflush(stdout);
@@ -367,7 +379,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }
             l_value=0;
             dap_events_socket_write_unsafe(a_es, &l_value, sizeof(l_value));
-        break;
+        }break;
         case CMD_READ_STATUS_N_PAGE:{ //read status and page
             //нужно подправить!!!
             struct fast_compile {
@@ -380,38 +392,6 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             //printf("fast complite: %d, num page complite: %d, slow complite %d\n", a_cmd_args[0], a_cmd_args[1], a_cmd_args[2]),fflush(stdout);
             dap_events_socket_write_unsafe(a_es, &l_reply, sizeof(l_reply));
         }break;
-        case CMD_READ_PAGE:
-            /*
-            read
-            a_cmd_args[0]- число страниц для чтения
-            a_cmd_args[1]- флаг для soft start
-            a_cmd_args[2]- флаг для передачи массивов X
-            */
-            l_value=4*(1+((a_cmd_args[2]&24)!=0));
-            printf("Npage %u\n",a_cmd_args[0]);
-            printf("soft start %u\n",a_cmd_args[1]);
-            if((a_cmd_args[1]&1)==1){//soft start
-                //                                		 readNPage(tmasFast,shift,0,1);
-                setNumPages(1);
-                setSizeSamples(1024);
-                onceGet(&tmasFast[0],&shift[0],0,0,0);
-                //                                		 onceGet(&tmasFast[8192],&shift[1024],0,0,1);
-            }else{
-                readNPages(&tmasFast[0],shift,a_cmd_args[0], l_value*16384, 0);//8192
-                //                                		 readNPages(&tmasFast[??],shift,a_cmd_args[0], val*16384, 1);//8192
-            }
-            for(size_t t=0;t<a_cmd_args[0];t++){
-                calibrate_do_curgr(&tmasFast[t*8192*l_value],ddata,shift,&COEFF,1024,2,a_cmd_args[2],g_ini);
-                log_it(L_DEBUG, "tmasFast[%d]=%f shift[%d]=%d",t*8192,ddata[0],t,shift[t]);
-                memcpy(&tmasFast[t*8192*l_value],ddata,sizeof(double)*8192);
-                if(l_value==8){
-                    drs_cal_get_array_x_old(ddata,shift,&COEFF,a_cmd_args[2]);
-                    memcpy(&tmasFast[(t*l_value+4)*8192],ddata,sizeof(double)*8192);
-                }
-            }
-            log_it(L_DEBUG, "buferSize=%u",2*8192*a_cmd_args[0]*l_value);
-            drs_proto_out_add_mem(DRS_PROTO(a_es), tmasFast,2*8192*a_cmd_args[0]*l_value);
-        break;
         default: log_it(L_WARNING, "Unknown command %d", a_cmd);
     }
 }

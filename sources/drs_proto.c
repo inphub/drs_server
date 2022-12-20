@@ -228,11 +228,11 @@ static void s_callback_write (dap_events_socket_t * a_es,void * a_arg )
 static void s_callback_write_finished(dap_events_socket_t * a_es, void * a_arg, int a_errno)
 {
     UNUSED (a_arg);
+    log_it(L_DEBUG, "Write finished with errno %d", a_errno);
     if(a_errno == 0) { // это не есть завершение по коду ошибки
         if (DRS_PROTO(a_es)->out_last) // Если нам всё ещё есть что отправить из очереди отправки, то возвращаем флаг готовности к записи
             dap_events_socket_set_writable_unsafe(a_es, true);
-    }else
-        log_it(L_DEBUG, "Write finished with errno %d", a_errno);
+    }
 }
 
 /**

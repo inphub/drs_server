@@ -828,15 +828,14 @@ static int s_thread_loop(dap_context_t * a_context)
             l_bytes_sent = 0;
 
             if (l_flag_write && (l_cur->flags & DAP_SOCK_READY_TO_WRITE) && !(l_cur->flags & DAP_SOCK_CONNECTING)) {
-                debug_if (g_debug_reactor, L_DEBUG, "Main loop output: %zu bytes to send", l_cur->buf_out_size);
                 if (l_cur->callbacks.write_callback)
                     l_cur->callbacks.write_callback(l_cur, NULL);           /* Call callback to process write event */
+                debug_if (g_debug_reactor, L_DEBUG, "Main loop output: %zu bytes to send", l_cur->buf_out_size);
 
                 /*
                  * Socket is ready to write and not going to close
                  */
-                if ( !l_cur->buf_out_size )                                     /* Check firstly that output buffer is not empty */
-                {
+                if ( !l_cur->buf_out_size ){                                     /* Check firstly that output buffer is not empty */
                     dap_events_socket_set_writable_unsafe(l_cur, false);        /* Clear "enable write flag" */
 
                     if ( l_cur->callbacks.write_finished_callback )             /* Optionaly call I/O completion routine */
@@ -980,7 +979,7 @@ static int s_thread_loop(dap_context_t * a_context)
                         }
 #endif
                     }else{
-                        //log_it(L_DEBUG, "Output: %u from %u bytes are sent ", l_bytes_sent,l_cur->buf_out_size);
+                        debug_if (g_debug_reactor, L_DEBUG, "Output: %d from %zd bytes are sent ", l_bytes_sent,l_cur->buf_out_size);
                         if (l_bytes_sent) {
                             if (l_cur->type == DESCRIPTOR_TYPE_SOCKET_CLIENT  || l_cur->type == DESCRIPTOR_TYPE_SOCKET_UDP) {
                                 l_cur->last_time_active = l_cur_time;

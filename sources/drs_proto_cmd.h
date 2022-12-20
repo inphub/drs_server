@@ -42,8 +42,7 @@ typedef enum drs_proto_cmd{
     CMD_GET_SHIFT          = 0xF, //получение массива сдвигов ячеек
 
     CMD_START              = 0x10, // старт
-    CMD_READ_STATUS_N_PAGE = 0x12, //read status and page
-    CMD_READ_PAGE          = 0x13, //read
+    CMD_READ_STATUS_N_PAGE = 0x12 //read status and page
 } drs_proto_cmd_t;
 
 // Максимальный номер команды
