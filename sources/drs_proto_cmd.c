@@ -278,7 +278,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             /*for(size_t c=0;c<DRS_CELLS_COUNT ;c++) {
                 ddata[c] = c;
             }*/
-            log_it( L_DEBUG, "ddata[0]=%f,ddata[1]=%f,ddata[2]=%f", ddata[0],ddata[1],ddata[2]);
+            //log_it( L_DEBUG, "ddata[0]=%f,ddata[1]=%f,ddata[2]=%f", ddata[0],ddata[1],ddata[2]);
             drs_proto_out_add_mem(DRS_PROTO(a_es), ddata,  sizeof(ddata) );
         }break;
 
