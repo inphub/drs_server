@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.0)
 # Название проекта и указание основного языка
 project(drs_server LANGUAGES C)
 # Этот инклуд реализует парсинг файлов и всасывание результатов в переменную
-include(sources/dap-sdk/cmake/ReadMKFile.cmake)
+include(dap-sdk/cmake/ReadMKFile.cmake)
 # Общие настройки
 set(CMAKE_ENABLE_EXPORTS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -20,11 +20,11 @@ add_definitions("-DDAP_VERSION=\"${VERSION_MAJOR}-${VERSION_MINOR}.${VERSION_PAT
 
 # Инклуд с определением операционки и выставлением различных дефайнов общего назначения
 # А так же выставление флагов для релиза и для отладки
-include(sources/dap-sdk/cmake/OS_Detection.cmake)
+include(dap-sdk/cmake/OS_Detection.cmake)
 # Перечисление модулей DAP SDK которые нам нужны
 set(DAPSDK_MODULES "core crypto io app-cli")
 # Подключение DAP SDK
-add_subdirectory(sources/dap-sdk)
+add_subdirectory(dap-sdk)
 
 # Подключаем библиотеку DRS
 add_subdirectory(libs/libdrs)

@@ -2,11 +2,11 @@
 set(CMAKE_SYSTEM_NAME Linux)
 
 # which compilers to use for C and C++
-set(CMAKE_C_COMPILER   /opt/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-gcc)
-set(CMAKE_CXX_COMPILER /opt/gcc-linaro-4.9.4-2017.01-x86_64_arm-linux-gnueabihf/bin/arm-linux-gnueabihf-g++)
+set(CMAKE_C_COMPILER   arm-linux-gnueabihf-gcc)
+set(CMAKE_CXX_COMPILER arm-linux-gnueabihf-g++)
 
 # where is the target environment located
-set(CMAKE_FIND_ROOT_PATH /opt/sysroot-eglibc-linaro-2017.01-arm-linux-gnueabihf ~/arm-linux-gnueabihf/)
+set(CMAKE_FIND_ROOT_PATH /usr/arm-linux-gnueabihf/)
 
 # adjust the default behavior of the FIND_XXX() commands:
 # search programs in the host environment

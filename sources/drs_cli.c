@@ -25,9 +25,9 @@ static int s_callback_calibrate(int argc, char ** argv, char **str_reply);
 static int s_callback_help(int argc, char ** argv, char **str_reply);
 static int s_callback_exit(int argc, char ** argv, char **str_reply);
 
-static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_state,unsigned a_limits, int a_flags );
 static int s_parse_drs_and_check(int a_arg_index, int a_argc, char ** a_argv, char **a_str_reply);
-
+static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply);
+static int s_cli_sinus(int a_argc, char ** a_argv, char **a_str_reply);
 
 /**
  * @brief drs_cli_init
@@ -75,13 +75,33 @@ int drs_cli_init()
                 "\n"
                            );
 
+
+    // Set some vars
+    dap_cli_server_cmd_add ("set", s_cli_set, "Set DRS variable",
+                            "\n"
+                            "set mode -drs <DRS num> -mode <DRS mode>"
+                            "\t Set DRS mode for selected number\n"
+                            "\t Possible modes: SOFT_START,EXT_START,PAGE_MODE,CAL_AMPL,CAL_TIME,OFF_INPUTS\n"
+                            "\n"
+                            ""
+                            );
+
+    // Set off/on sinus generator
+    dap_cli_server_cmd_add ("sinus", s_cli_sinus, "Sinus generator switch",
+                            "\n"
+                            "sinus on|off"
+                            "\t Switch sinus generator on or off\n"
+                            "\n"
+                            ""
+                            );
+
     // Get raw data
     dap_cli_server_cmd_add ("read", s_callback_read, "Read raw data ",
                             "\n"
                             "read write_ready [-drs <DRS num>]"
                             "\t Check for write_ready flag for target DRS or for all"
                             "\n"
-                            "read page [-drs <DRS num>]"
+                            "read page [-drs <DRS num>] [-limit <Limit cells number for output>]"
                             "\t Call getOnce() and read one raw page at once for target DRS or for all"
                             "\n"
                             ""
@@ -296,6 +316,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             }
             uint32_t l_flags = 0;
             unsigned l_min_N = 0;
+            unsigned l_max_repeats = DRS_CAL_MAX_REPEATS_DEFAULT;
             double l_begin = 0;
             double l_end = 0;
             double l_shifts[DRS_DCA_COUNT_ALL] ={};
@@ -398,13 +419,25 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
             if (l_flags & DRS_CAL_FLAG_TIME_LOCAL){
                 // конвертируем min_N
                 const char * l_min_N_str = NULL;
-                char * l_min_N_str_endptr = NULL;
+                const char * l_max_repeats_str = NULL;
+                char * l_tmp_endptr = NULL;
+
                 dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-min_N",        &l_min_N_str);
-                l_min_N = strtoul( l_min_N_str, & l_min_N_str_endptr, 10);
-                if (l_min_N_str_endptr == l_min_N_str){
+
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-max_repeats",        &l_max_repeats_str);
+                l_min_N = strtoul( l_min_N_str, & l_tmp_endptr, 10);
+                if (l_tmp_endptr == l_min_N_str){
                     dap_cli_server_cmd_set_reply_text(a_str_reply, "MinN value \"%s\" can't be converted to unsigned integer", l_min_N_str );
                     return -29;
                 }
+
+                dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-max_repeats",        &l_max_repeats_str);
+                l_max_repeats = strtoul( l_max_repeats_str, & l_tmp_endptr, 10);
+                if (l_tmp_endptr == l_max_repeats_str){
+                    dap_cli_server_cmd_set_reply_text(a_str_reply, "max repeats value \"%s\" can't be converted to unsigned integer", l_max_repeats_str );
+                    return -29;
+                }
+
             }
             // Глобальная временная калибровка
             if (l_flags & DRS_CAL_FLAG_TIME_GLOBAL){
@@ -429,7 +462,8 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                     .num_cycle = l_num_cycle
                 },
                 .time_local = {
-                    .min_N = l_min_N
+                    .min_N = l_min_N,
+                    .max_repeats = l_max_repeats
                 }
             };
             l_params.ampl.levels[0] = l_begin;
@@ -459,14 +493,14 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
         }else if  (strcmp(a_argv[1], "state") == 0 ){ // Subcommand "check"
             dap_string_t * l_reply = dap_string_new("Check drs calibration progress:\n");
             const char * l_coeffs_str = NULL;
-            const char * l_limits_str = NULL;
+            const char * l_limit_str = NULL;
             int l_coeffs_flags = 0;
             unsigned l_limits = 0;
             dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-coeffs",  &l_coeffs_str);
-            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-limits",  &l_limits_str);
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-limit",  &l_limit_str);
 
-            if (l_limits_str)
-              l_limits = atoi(l_limits_str);
+            if (l_limit_str)
+              l_limits = atoi(l_limit_str);
 
             if ( l_coeffs_str == NULL || dap_strcmp( l_coeffs_str, "ALL") == 0){
                 log_it(L_DEBUG, "Coeffs: ALL");
@@ -507,12 +541,12 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 for (int i = 0; i < DRS_COUNT; i++){
                     drs_calibrate_t *l_cal = drs_calibrate_get_state(i);
                     dap_string_append_printf(l_reply, "--== DRS %d ==--\n", i);
-                    s_calibrate_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
+                    drs_cal_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
                 }
             }else{ // Если указан, то только конкретный
                 drs_calibrate_t * l_cal = drs_calibrate_get_state(l_drs_num);
                 dap_string_append_printf(l_reply, "--== DRS %d ==--\n", l_drs_num);
-                s_calibrate_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
+                drs_cal_state_print(l_reply, l_cal, l_limits, l_coeffs_flags);
             }
             *a_str_reply = dap_string_free(l_reply, false);
         } else if ( dap_strcmp( a_argv[1], "abort") == 0){
@@ -543,81 +577,124 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
     }
 }
 
-#define dap_string_append_array(a_reply, a_name, a_fmt, a_array, a_limits )\
-    {\
-        size_t l_array_count = (sizeof(a_array))/sizeof(a_array[0]); \
-        size_t l_limit = a_limits == 0 || a_limits > l_array_count ? l_array_count  : a_limits; \
-        dap_string_append_printf(a_reply,"%s:{",a_name);\
-        for (size_t i = 0; i < l_limit ; i++){\
-            dap_string_append_printf(a_reply, a_fmt, a_array[i]); \
-            if (i != l_limit-1 ) \
-                dap_string_append_printf(a_reply, ", "); \
-            if ( i && i % 16 == 0 ) \
-                dap_string_append_printf(a_reply, "\n"); \
-        } \
-        dap_string_append_printf(a_reply,"}\n");\
-    }
+/**
+ * @brief s_cli_sinus
+ * @param a_argc
+ * @param a_argv
+ * @param a_str_reply
+ * @return
+ */
+static int s_cli_sinus(int a_argc, char ** a_argv, char **a_str_reply)
+{
+  if(a_argc < 2) {
+      dap_cli_server_cmd_set_reply_text(a_str_reply, "No required argument off|on " );
+      return -2;
+  }
+  if (dap_strcmp(a_argv[1],"on") == 0 ){ // Включаем синус
+      drs_set_sinus_signal(true);
+      dap_cli_server_cmd_set_reply_text(a_str_reply,"Sinus switched on\n");
+  } else if (dap_strcmp(a_argv[1],"off") == 0 ) { // Выключаем синус
+      drs_set_sinus_signal(false);
+      dap_cli_server_cmd_set_reply_text(a_str_reply,"Sinus switched off\n");
+  }else{
+      dap_cli_server_cmd_set_reply_text(a_str_reply,"Wrong argument, can be only \"off\" or \"on\"\n");
+      return -3;
+  }
+  return 0;
+}
 
 
 /**
- * @brief s_calibrate_state_print
- * @param a_reply
- * @param a_cal
- * @param a_limits
- * @param a_flags
+ * @brief s_cli_set
+ * @param a_argc
+ * @param a_argv
+ * @param a_str_reply
+ * @return 0 if all is good, something else if not
  */
-static void s_calibrate_state_print(dap_string_t * a_reply, drs_calibrate_t *a_cal, unsigned a_limits, int a_flags)
+static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply)
 {
-    pthread_rwlock_rdlock(&a_cal->rwlock);
-    dap_string_append_printf( a_reply, "Running:     %s\n", a_cal->is_running? "yes" : "no" );
-    dap_string_append_printf( a_reply, "Progress:    %d%%\n", a_cal->progress );
-    if (a_cal->ts_end){
-        coefficients_t * l_params = &a_cal->drs->coeffs;
-        if ( a_flags & DRS_COEF_SPLASH)
-            dap_string_append_array(a_reply, "splash", "0x%08X", l_params->splash, a_limits);
+    // Описываем субкомманды
+    enum {
+        CMD_NONE =0,
+        CMD_MODE,
+        CMD_REG,
+    };
+    const char *l_cmd_str_c[] ={
+        [CMD_MODE] = "mode",
+        [CMD_REG] = "reg",
+    };
 
-
-        if ( a_flags & DRS_COEF_DELTA_TIME )
-            dap_string_append_array(a_reply, "deltaTimeRef", "%f", l_params->deltaTimeRef, a_limits);
-
-        if ( a_flags & DRS_COEF_CHAN_K )
-            dap_string_append_array(a_reply, "chanK", "%f", l_params->chanK, a_limits);
-
-        if ( a_flags & DRS_COEF_CHAN_B )
-            dap_string_append_array(a_reply, "chanB", "%f", l_params->chanB, a_limits);
-
-        if ( a_flags & DRS_COEF_K_TIME )
-            dap_string_append_array(a_reply, "kTime", "%f", l_params->kTime, a_limits);
-
-        if ( a_flags & DRS_COEF_K ){
-            char l_str[128];
-            for(unsigned c = 0; c< DRS_CHANNELS_COUNT; c++){
-                snprintf(l_str, sizeof(l_str),"k[%u]", c);
-                dap_string_append_array(a_reply, l_str, "%f", l_params->k[c], a_limits);
-            }
-        }
-
-        if ( a_flags & DRS_COEF_B ){
-            char l_str[128];
-            for(unsigned c = 0; c< DRS_CHANNELS_COUNT; c++){
-                snprintf(l_str, sizeof(l_str),"b[%u]", c);
-                dap_string_append_array(a_reply, l_str, "%f", l_params->b[c], a_limits);
-            }
-        }
-
-        if ( a_flags & DRS_COEF_K9 )
-            dap_string_append_array(a_reply, "k9", "%f", l_params->k9, a_limits);
-
-        if ( a_flags & DRS_COEF_B9 )
-            dap_string_append_array(a_reply, "b9", "%f", l_params->b9, a_limits);
-
-        dap_string_append_printf( a_reply, "indicator=%d \n", l_params->indicator);
-        dap_string_append_printf( a_reply, "Got time:    %.3f seconds \n",
-                                   ((double) (a_cal->ts_end - a_cal->ts_start)) / 1000000000.0 );
-
-
+    if(a_argc < 3) {
+        dap_cli_server_cmd_set_reply_text(a_str_reply, "No required arguments" );
+        return -2;
     }
-    pthread_rwlock_unlock(&a_cal->rwlock);
+
+    const char * l_cmd = a_argv[1]; // Строка с субкоммандой
+
+    // Парсим субкоманды
+    int l_cmd_num = CMD_NONE;
+    for(int idx = 0; (size_t) idx < sizeof (l_cmd_str_c) / sizeof(typeof (*l_cmd_str_c)); idx ++ ){
+        if( dap_strcmp(l_cmd, l_cmd_str_c[idx]) == 0 ) {
+            l_cmd_num = idx;
+            break;
+        }
+    }
+
+    // Сдвигаемся после сабкоманнды до следующего индекса после неё, чтобы распарсить её аргументы
+    int l_arg_index = 1;
+
+    // Читаем общие аргументы
+    int l_drs_num = s_parse_drs_and_check(l_arg_index,a_argc,a_argv,a_str_reply) ; // -1 значит для всех
+    if (l_drs_num < -1){
+        return -100;
+    }
+    if( l_drs_num == -1 ){
+        dap_cli_server_cmd_set_reply_text(a_str_reply, "Command requires DRS number with argument -drs <DRS number>");
+        return -2;
+    }
+    drs_t * l_drs = &g_drs[l_drs_num];
+    switch(l_cmd_num){
+        case CMD_MODE:{
+            const char * l_arg_mode = NULL;
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "-mode", &l_arg_mode);
+            if( ! l_arg_mode ){
+                dap_cli_server_cmd_set_reply_text(a_str_reply, "Command requires DRS mode with argument -mode <DRS mode>");
+                return -2;
+            }
+            int l_mode = -1;
+
+            //  Парсим режимы ДРСки
+            const char *l_mode_str_c[]={
+                [DRS_MODE_SOFT_START] = "SOFT_START", [DRS_MODE_EXT_START]  = "EXT_START", [DRS_MODE_PAGE_MODE]  = "PAGE_MODE",
+                [DRS_MODE_CAL_AMPL]   = "CAL_AMPL",   [DRS_MODE_CAL_TIME]   = "CAL_TIME",  [DRS_MODE_OFF_INPUTS] = "OFF_INPUTS"
+            };
+            for(int idx = 0; (size_t) idx < DRS_MODE_MAX ; idx ++ ){
+                if( dap_strcmp(l_arg_mode, l_mode_str_c[idx]) == 0 ) {
+                    l_mode = idx;
+                    break;
+                }
+            }
+
+            if (l_mode < 0){
+                dap_cli_server_cmd_set_reply_text(a_str_reply, "Wrong argument mode \"\%s\"",  l_arg_mode);
+                break;
+            }
+
+            drs_set_mode(l_drs->id, l_mode);
+            dap_cli_server_cmd_set_reply_text(a_str_reply, "DRS #%u mode is %s now",l_drs->id, l_arg_mode);
+        } break;
+        case CMD_REG:{
+            const char * l_reg_str = a_argv[2];
+            const char * l_value_str = a_argv[3];
+            char * l_parse_end = NULL;
+           // strtoul(l_reg_str,)
+        }
+        break;
+        default:
+            dap_cli_server_cmd_set_reply_text(a_str_reply, "No subcommand \"%s\"", l_cmd);
+            return -1;
+    }
+    return 0;
 }
 
 /**

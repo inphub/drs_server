@@ -192,7 +192,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                     .num_cycle = a_cmd_args[4]
                 },
                 .time_local = {
-                    .min_N = a_cmd_args[3]
+                    .min_N = a_cmd_args[3],
+                    .max_repeats = DRS_CAL_MAX_REPEATS_DEFAULT
                 }
             };
             memcpy(l_params.ampl.levels, l_levels,sizeof (l_params.ampl.levels) );
@@ -270,9 +271,10 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }
             //for(size_t t=0;t<a_cmd_args[1];t++) {
             drs_cal_ampl_apply(l_drs, tmasFast, ddata, a_cmd_args[3]);
-            if(l_value==8){
-                log_it(L_NOTICE, "Apply another calibrations");
-                drs_cal_get_array_x(l_drs, ddata, a_cmd_args[3]);
+
+            if(a_cmd_args[3] & DRS_CAL_AMPL_APPLY_TIME_LOCAL || l_value==8){
+                log_it(L_NOTICE, "Apply time local calibrations");
+                drs_cal_get_array_x(l_drs, ddata, DRS_CAL_FLAG_TIME_LOCAL );
             }
             //}
             /*for(size_t c=0;c<DRS_CELLS_COUNT ;c++) {
@@ -343,8 +345,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 break;
                 case 1: //01 - soft start and read (one page)
                     log_it(L_DEBUG, "01 - soft start and read (one page)\n");
-                    drs_set_sinus_signal(true);
-                    drs_set_mode(l_drs_num, MODE_SOFT_START);
+                    //drs_set_sinus_signal(true);
+                    //drs_set_mode(l_drs_num, MODE_SOFT_START);
                     drs_start(l_drs_num);
                     //write_reg(0x00000015, 0);  //page mode disable
 
