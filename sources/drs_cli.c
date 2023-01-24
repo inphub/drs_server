@@ -83,6 +83,8 @@ int drs_cli_init()
                             "\t Set DRS mode for selected number\n"
                             "\t Possible modes: SOFT_START,EXT_START,PAGE_MODE,CAL_AMPL,CAL_TIME,OFF_INPUTS\n"
                             "\n"
+                            "set dac shifts <DAC shifts lists>"
+                            "\t Set DAC shifts as list, splitted with \",\"\n"
                             ""
                             );
 
@@ -278,6 +280,73 @@ static int s_callback_read(int a_argc, char ** a_argv, char **a_str_reply)
 }
 
 /**
+ * @brief dap_cli_server_cmd_parse_list_doubles
+ * @param a_str_reply
+ * @param a_str
+ * @param a_array
+ * @param a_array_size_min
+ * @param a_array_size_max
+ * @param a_array_size
+ * @return
+ */
+int dap_cli_server_cmd_parse_list_doubles(char ** a_str_reply,  const char * a_str, double * a_array, const size_t a_array_size_min, const size_t a_array_size_max, size_t * a_array_size )
+{
+    assert(a_array);
+    assert(a_array_size_max);
+    int l_retcode = 0;
+    char ** l_strs = dap_strsplit(a_str, ",",a_array_size_max);
+    if (l_strs == NULL){
+        dap_cli_server_cmd_set_reply_text(a_str_reply, "List argument is empty");
+        l_retcode = -22;
+        goto lb_exit;
+    }
+    size_t n =0;
+    for ( n = 0; l_strs[n] && n <= a_array_size_max ; n ++){
+        char * l_shift_str = l_strs[n];
+        char * l_shift_str_endptr = NULL;
+        double l_shift = strtod( l_shift_str, & l_shift_str_endptr);
+        if (l_shift_str_endptr == l_shift_str){
+            dap_cli_server_cmd_set_reply_text(a_str_reply, "List argument #%i can't be converted to double value (\"%s\"",
+                                              n,l_shift_str);
+            l_retcode = -23;
+            goto lb_exit;
+        }
+        a_array[n] = l_shift;
+        DAP_DELETE(l_shift_str);
+    }
+
+    // Сохраняем количество записанных элементов
+    if (a_array_size)
+        *a_array_size = n;
+
+    // Если мы прошли корректно весь список, то удаляем исходный массив
+    if(! l_strs[n] )
+        DAP_DEL_Z(l_strs);
+
+    if (n < a_array_size_min){
+        dap_cli_server_cmd_set_reply_text(a_str_reply, "List size %u is too small, should be %u at least",
+                                          n,a_array_size_min);
+        l_retcode = -24;
+        goto lb_exit;
+    }
+    if (n > a_array_size_max){
+        dap_cli_server_cmd_set_reply_text(a_str_reply, "List size %u is too big, should be not more than %u",
+                                          n,a_array_size_max);
+        l_retcode = -25;
+        goto lb_exit;
+    }
+    return 0;
+lb_exit:
+    if (l_strs){
+        for (; l_strs[n]; n ++){
+            DAP_DELETE(l_strs[n]);
+        }
+        DAP_DELETE(l_strs);
+    }
+    return l_retcode;
+}
+
+/**
  * @brief s_callback_calibrate
  * @param argc
  * @param argv
@@ -336,6 +405,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
 
             // Амплитудная калибровка
             if (l_flags & DRS_CAL_FLAG_AMPL){
+                int l_ret;
                 const char * l_repeats_str = NULL;
                 const char * l_N_str = NULL;
                 const char * l_begin_str = NULL;
@@ -354,33 +424,11 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 }
 
                 // Конвертируем смещения
-                char ** l_shifts_strs = dap_strsplit(l_shifts_str, ",",DRS_CHANNELS_COUNT);
-                if (l_shifts_strs == NULL){
-                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts argument is empty");
-                    return -22;
+
+                if ( (l_ret = dap_cli_server_cmd_parse_list_double(a_str_reply,l_shifts_str,l_shifts,DRS_CHANNELS_COUNT,DRS_CHANNELS_COUNT,NULL)) < 0 ){
+                    return l_ret;
                 }
-                size_t l_shifts_num =0;
-                for ( l_shifts_num = 0; l_shifts_strs[l_shifts_num]; l_shifts_num ++){
-                    char * l_shift_str = l_shifts_strs[l_shifts_num];
-                    char * l_shift_str_endptr = NULL;
-                    double l_shift = strtod( l_shift_str, & l_shift_str_endptr);
-                    if (l_shift_str_endptr == l_shift_str){
-                        dap_cli_server_cmd_set_reply_text(a_str_reply, "Shift #%i can't be converted to double value (\"%s\"",
-                                                          l_shifts_num,l_shift_str);
-                        return -23;
-                    }
-                    l_shifts[l_shifts_num] = l_shift;
-                }
-                if (l_shifts_num < DRS_CHANNELS_COUNT){
-                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too small, should be %u",
-                                                      l_shifts_num,DRS_CHANNELS_COUNT);
-                    return -24;
-                }
-                if (l_shifts_num > DRS_CHANNELS_COUNT){
-                    dap_cli_server_cmd_set_reply_text(a_str_reply, "Shifts number %u is too big, should be %u",
-                                                      l_shifts_num,DRS_CHANNELS_COUNT);
-                    return -25;
-                }
+
 
                 // конвертируем begin
                 char * l_begin_str_endptr = NULL;
@@ -618,10 +666,12 @@ static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply)
         CMD_NONE =0,
         CMD_MODE,
         CMD_REG,
+        CMD_DAC
     };
     const char *l_cmd_str_c[] ={
         [CMD_MODE] = "mode",
         [CMD_REG] = "reg",
+        [CMD_DAC] = "dac"
     };
 
     if(a_argc < 3) {
@@ -690,6 +740,23 @@ static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply)
            // strtoul(l_reg_str,)
         }
         break;
+        case CMD_DAC:{
+            int l_ret;
+            const char * l_shifts_str = NULL;
+            double l_shifts[DRS_CHANNELS_COUNT];
+            dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "shifts", &l_shifts_str);
+            //fill_array(shiftDACValues, &lvl, DRS_CHANNELS_COUNT, sizeof(lvl));
+            if(!l_shifts_str){
+                dap_cli_server_cmd_set_reply_text(a_str_reply, "No action selected");
+                return -1;
+            }
+
+            if ( (l_ret = dap_cli_server_cmd_parse_list_double(a_str_reply,l_shifts_str,l_shifts,DRS_CHANNELS_COUNT,DRS_CHANNELS_COUNT,NULL)) < 0 ){
+                return l_ret;
+            }
+
+            drs_dac_shift_set_all(l_drs->id, l_shifts,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+        } break;
         default:
             dap_cli_server_cmd_set_reply_text(a_str_reply, "No subcommand \"%s\"", l_cmd);
             return -1;
