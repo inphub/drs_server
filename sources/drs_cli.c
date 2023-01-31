@@ -744,6 +744,8 @@ static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply)
             int l_ret;
             const char * l_shifts_str = NULL;
             double l_shifts[DRS_CHANNELS_COUNT];
+            bool l_is_ch9 = (drs_get_mode(l_drs->id) == DRS_MODE_CAL_TIME);
+
             dap_cli_server_cmd_find_option_val(a_argv,l_arg_index, a_argc, "shifts", &l_shifts_str);
             //fill_array(shiftDACValues, &lvl, DRS_CHANNELS_COUNT, sizeof(lvl));
             if(!l_shifts_str){
@@ -751,11 +753,16 @@ static int s_cli_set(int a_argc, char ** a_argv, char **a_str_reply)
                 return -1;
             }
 
-            if ( (l_ret = dap_cli_server_cmd_parse_list_double(a_str_reply,l_shifts_str,l_shifts,DRS_CHANNELS_COUNT,DRS_CHANNELS_COUNT,NULL)) < 0 ){
+            if ( (l_ret = dap_cli_server_cmd_parse_list_double(a_str_reply,l_shifts_str,l_shifts,
+                                                               l_is_ch9 ? 1: DRS_CHANNELS_COUNT,DRS_CHANNELS_COUNT,NULL)) < 0 ){
                 return l_ret;
             }
 
-            drs_dac_shift_set_all(l_drs->id, l_shifts,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+            if (l_is_ch9){
+                drs_dac_shift_set_ch9(l_shifts[0],g_ini_ch9.gain, g_ini_ch9.offset);
+            } else {
+                drs_dac_shift_set_all(l_drs->id, l_shifts,g_ini->fastadc.dac_gains, g_ini->fastadc.dac_offsets);
+            }
         } break;
         default:
             dap_cli_server_cmd_set_reply_text(a_str_reply, "No subcommand \"%s\"", l_cmd);
