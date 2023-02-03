@@ -32,6 +32,10 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
     [CMD_INI_WRITE]           = sizeof(*g_ini),
     [CMD_READ]                = 4 * sizeof(uint32_t),
+    [CMD_READ_X]              = 3 * sizeof(uint32_t), // Read X
+    [CMD_READ_Y]              = 3 * sizeof(uint32_t), // Read Y
+
+
     [CMD_SHIFT_DAC_SET]       = 1 * sizeof(uint32_t),
     [CMD_FF]                  = 1 * sizeof(uint32_t),
     [CMD_GET_SHIFT]           = 1 * sizeof(uint32_t),
@@ -48,7 +52,8 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 
 coefficients_t COEFF = {};
 uint32_t shift [DRS_COUNT * 1024] = {0};
-double ddata[DRS_CELLS_COUNT] = {0};
+double s_data_y[DRS_CELLS_COUNT] = {0};
+double s_data_x[DRS_CELLS_COUNT_CHANNEL ] = {0};
 
 void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
@@ -248,9 +253,10 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             a_cmd_args[0]- номер DRS
             a_cmd_args[1]- число страниц для чтения
             a_cmd_args[2]- флаг для soft start
-            a_cmd_args[3]- флаг для передачи массивов X
+            a_cmd_args[3]- флаги для передачи массивов Y и X
             */
             int a_drs_num = a_cmd_args[0];
+            int l_flags = a_cmd_args[3];
             if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
                 log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
                 break;
@@ -269,20 +275,73 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             }else{
                 drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
             }
-            //for(size_t t=0;t<a_cmd_args[1];t++) {
-            drs_cal_ampl_apply(l_drs, tmasFast, ddata, a_cmd_args[3]);
 
-            if(a_cmd_args[3] & DRS_CAL_AMPL_APPLY_TIME_LOCAL || l_value==8){
-                log_it(L_NOTICE, "Apply time local calibrations");
-                drs_cal_get_array_x(l_drs, ddata, DRS_CAL_FLAG_TIME_LOCAL );
-            }
-            //}
-            /*for(size_t c=0;c<DRS_CELLS_COUNT ;c++) {
-                ddata[c] = c;
-            }*/
-            //log_it( L_DEBUG, "ddata[0]=%f,ddata[1]=%f,ddata[2]=%f", ddata[0],ddata[1],ddata[2]);
-            drs_proto_out_add_mem(DRS_PROTO(a_es), ddata,  sizeof(ddata) );
+            if (l_flags & 1 )
+                drs_cal_y_apply(l_drs, tmasFast, s_data_y ,l_flags);
+
+            drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_y,  sizeof(s_data_y) );
+
+
         }break;
+
+        case CMD_READ_Y:{
+            /*
+            read
+            a_cmd_args[0]- номер DRS
+            a_cmd_args[1]- число страниц для чтения
+            a_cmd_args[2]- флаги
+            */
+            int a_drs_num = a_cmd_args[0];
+            int l_flags = a_cmd_args[3];
+            if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
+                log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
+                break;
+            }
+            drs_t * l_drs = g_drs + a_drs_num;
+
+            l_value=4*(1+((a_cmd_args[3]&24)!=0));
+            log_it(L_INFO, "Read Y cmd: drs_num=%u,npages=%u,flags=0x%08X",
+                   a_cmd_args[0],a_cmd_args[1],a_cmd_args[2]);
+
+            if((a_cmd_args[1]&1)==1 || true){//soft start
+                drs_set_num_pages(l_drs, 1);
+                drs_data_get_all( l_drs, 0, tmasFast);
+            }else{
+                drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
+            }
+
+            drs_cal_y_apply(l_drs, tmasFast, s_data_y ,l_flags);
+
+            drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_y,  sizeof(s_data_y) );
+
+        }break;
+
+        case CMD_READ_X:{
+            /*
+            read
+            a_cmd_args[0]- номер DRS
+            a_cmd_args[1]- число страниц для чтения
+            a_cmd_args[2]- флаги
+            */
+            int a_drs_num = a_cmd_args[0];
+            int l_flags = a_cmd_args[3];
+            //unsigned l_pages_count = a_cmd_args[1];
+
+            if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
+                log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
+                break;
+            }
+            drs_t * l_drs = g_drs + a_drs_num;
+
+            for (unsigned n =0; n <DRS_CELLS_COUNT_CHANNEL; n++){
+                s_data_x[n] = n;
+            }
+
+            drs_cal_x_apply(l_drs, s_data_x ,l_flags);
+
+            drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_x,  sizeof(s_data_x) );
+        }break;
+
 
         case CMD_SHIFT_DAC_SET:{
             //set shift DAC

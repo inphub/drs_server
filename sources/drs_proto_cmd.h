@@ -37,6 +37,10 @@ typedef enum drs_proto_cmd{
     CMD_CALIBRATE_RESULTS   = 0x1E, // Calibration results
 
     CMD_READ               = 0xC, // Read
+
+    CMD_READ_X               = 0xCC, // Read X
+    CMD_READ_Y               = 0xCD, // Read Y
+
     CMD_SHIFT_DAC_SET      = 0xD , // Set ShiftDAC
     CMD_FF                 = 0xE , // ??? Sends 15 always back
     CMD_GET_SHIFT          = 0xF, //получение массива сдвигов ячеек

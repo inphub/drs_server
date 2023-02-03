@@ -103,6 +103,7 @@ int main(int argc, const char **argv)
     // New event loop init
     dap_events_init(l_thread_cnt, 3600*24*365);
     dap_events_start();
+    usleep(2000);
 
     g_server_enabled = dap_config_get_item_bool_default( g_config, "server", "enabled", false );
 
