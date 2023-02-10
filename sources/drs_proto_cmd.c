@@ -32,7 +32,7 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
     [CMD_INI_FILE_WRITE]      = sizeof(*g_ini),
     [CMD_INI_WRITE]           = sizeof(*g_ini),
     [CMD_READ]                = 4 * sizeof(uint32_t),
-    [CMD_READ_X]              = 3 * sizeof(uint32_t), // Read X
+    [CMD_READ_X]              = 2 * sizeof(uint32_t), // Read X
     [CMD_READ_Y]              = 3 * sizeof(uint32_t), // Read Y
 
 
@@ -276,8 +276,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
             }
 
-            if (l_flags & 1 )
-                drs_cal_y_apply(l_drs, tmasFast, s_data_y ,l_flags);
+            drs_cal_y_apply(l_drs, tmasFast, s_data_y ,l_flags);
 
             drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_y,  sizeof(s_data_y) );
 
@@ -292,7 +291,10 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             a_cmd_args[2]- флаги
             */
             int a_drs_num = a_cmd_args[0];
-            int l_flags = a_cmd_args[3];
+
+            // TODO убрать после исправлений бага в Ui
+            // тут мы просто отфильтровываем корректные флаги
+            int l_flags =  a_cmd_args[2] & DRS_CAL_APPLY_Y_CELLS;
             if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
                 log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
                 break;
@@ -300,8 +302,8 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             drs_t * l_drs = g_drs + a_drs_num;
 
             l_value=4*(1+((a_cmd_args[3]&24)!=0));
-            log_it(L_INFO, "Read Y cmd: drs_num=%u,npages=%u,flags=0x%08X",
-                   a_cmd_args[0],a_cmd_args[1],a_cmd_args[2]);
+            log_it(L_INFO, "Read Y cmd: drs_num=%u,npages=%u,flags=0x%08X (%d )",
+                   a_cmd_args[0],a_cmd_args[1],a_cmd_args[2],l_flags);
 
             if((a_cmd_args[1]&1)==1 || true){//soft start
                 drs_set_num_pages(l_drs, 1);
@@ -320,12 +322,10 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             /*
             read
             a_cmd_args[0]- номер DRS
-            a_cmd_args[1]- число страниц для чтения
-            a_cmd_args[2]- флаги
+            a_cmd_args[1]- флаги
             */
             int a_drs_num = a_cmd_args[0];
-            int l_flags = a_cmd_args[3];
-            //unsigned l_pages_count = a_cmd_args[1];
+            int l_flags = a_cmd_args[1];
 
             if(a_drs_num <0 || a_drs_num >=DRS_COUNT){
                 log_it(L_ERROR, "Can't get DRS #%d", a_drs_num);
@@ -336,10 +336,11 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             for (unsigned n =0; n <DRS_CELLS_COUNT_CHANNEL; n++){
                 s_data_x[n] = n;
             }
-
             drs_cal_x_apply(l_drs, s_data_x ,l_flags);
-
             drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_x,  sizeof(s_data_x) );
+
+            log_it(L_INFO, "X array requested, apply flags 0x%08X, x[0]=%.4f, x[1]=%.4f, x[2]=%.4f, x[3]=%.4f, x[4]=%.4f ",
+                   l_flags, s_data_x[0], s_data_x[1], s_data_x[2], s_data_x[3], s_data_x[4]);
         }break;
 
 
