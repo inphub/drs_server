@@ -50,10 +50,10 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 #define MAX_PAGE_COUNT 1000
 //#define SIZE_FAST MAX_PAGE_COUNT*1024*8*8
 
-coefficients_t COEFF = {};
-uint32_t shift [DRS_COUNT * 1024] = {0};
-double s_data_y[DRS_CELLS_COUNT] = {0};
-double s_data_x[DRS_CELLS_COUNT_CHANNEL ] = {0};
+static double s_data_y[DRS_CELLS_COUNT] = {0};
+static double s_data_x[DRS_CELLS_COUNT_CHANNEL ] = {0};
+
+static int s_read_y_flags_add =  DRS_OP_FLAG_ROTATE;
 
 void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
@@ -95,13 +95,15 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
             uint16_t l_tmpshift=((unsigned long *)data_map_shift_drs1)[0];
             log_it( L_DEBUG, "read shifts: shift DRS1 = 0x%04x, shift DRS1=0x%04x", ((unsigned short *)data_map_shift_drs1)[0], ((unsigned short *)data_map_shift_drs2)[0]);
             dap_events_socket_write_unsafe( a_es, &l_tmpshift, sizeof (l_tmpshift));
-            break;}
+            break;
+        }
 
         case CMD_SHIFT_READ_DRS2:{ //read shift drs2
             uint16_t l_tmpshift=((unsigned long *)data_map_shift_drs1)[0];
             log_it( L_DEBUG, "read shifts: shift DRS1 = 0x%04x, shift DRS2=0x%04x", ((unsigned short *)data_map_shift_drs1)[0], ((unsigned short *)data_map_shift_drs2)[0]);
             dap_events_socket_write_unsafe( a_es, &l_tmpshift, sizeof (l_tmpshift));
-            break;}
+            break;
+        }
 
         case CMD_INI_READ: //read ini
             assert (g_ini);
@@ -307,12 +309,13 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
 
             if((a_cmd_args[1]&1)==1 || true){//soft start
                 drs_set_num_pages(l_drs, 1);
-                drs_data_get_all( l_drs, 0, tmasFast);
+                drs_data_get_all( l_drs, s_read_y_flags_add, tmasFast);
             }else{
-                drs_read_pages(l_drs, a_cmd_args[1], l_value* 8192, tmasFast, sizeof (tmasFast));
+                drs_read_pages(l_drs, a_cmd_args[1] | s_read_y_flags_add, l_value* 8192, tmasFast, sizeof (tmasFast));
             }
 
             drs_cal_y_apply(l_drs, tmasFast, s_data_y ,l_flags);
+
 
             drs_proto_out_add_mem(DRS_PROTO(a_es), s_data_y,  sizeof(s_data_y) );
 
