@@ -5,6 +5,7 @@
 #include <dap_process_manager.h>
 #include <dap_server.h>
 #include <dap_events.h>
+#include <dap_proc_thread.h>
 #include <dap_strfuncs.h>
 #include <dap_file_utils.h>
 #include <dap_cli_server.h>
@@ -103,6 +104,7 @@ int main(int argc, const char **argv)
     // New event loop init
     dap_events_init(l_thread_cnt, 3600*24*365);
     dap_events_start();
+    dap_proc_thread_init(l_thread_cnt);
     usleep(2000);
 
     g_server_enabled = dap_config_get_item_bool_default( g_config, "server", "enabled", false );
@@ -185,6 +187,7 @@ int main(int argc, const char **argv)
     // Deinit modules
     drs_proto_deinit();
     drs_calibrate_deinit();
+    dap_events_deinit();
     dap_config_close( g_config );
     dap_interval_timer_deinit();
     dap_common_deinit();

@@ -53,7 +53,7 @@ size_t g_drs_proto_args_size[DRS_PROTO_CMD_MAX]={
 static double s_data_y[DRS_CELLS_COUNT] = {0};
 static double s_data_x[DRS_CELLS_COUNT_CHANNEL ] = {0};
 
-static int s_read_y_flags_add =  DRS_OP_FLAG_ROTATE;
+static int s_read_y_flags_add = DRS_OP_FLAG_ROTATE;
 
 void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* a_cmd_args)
 {
@@ -194,6 +194,7 @@ void drs_proto_cmd(dap_events_socket_t * a_es, drs_proto_cmd_t a_cmd, uint32_t* 
                 .ampl = {
                     .repeats = a_cmd_args[5],
                     .N = a_cmd_args[2],
+                    .splash_gauntlet = DRS_CAL_SPLASH_GAUNTLET_DEFAULT
                 },
                 .time_global = {
                     .num_cycle = a_cmd_args[4]

@@ -45,9 +45,9 @@ int drs_cli_init()
                 "exit\n" );
 
     // Init DRS
-    dap_cli_server_cmd_add ("init", s_callback_init, "Init DRS",
+    dap_cli_server_cmd_add ("init", s_callback_init, "Init DRS. Don't need it by default",
                 "init\n"
-                "\tInit DRS\n"
+                "\tInit DRS if it wasn't initialized on start (thats by default in COMMON section)\n"
              );
 
 
@@ -157,10 +157,18 @@ static int s_parse_drs_and_check(int a_arg_index, int a_argc, char ** a_argv, ch
  */
 static int s_callback_init(int a_argc, char ** a_argv, char **a_str_reply)
 {
+    UNUSED(a_argc);
+    UNUSED(a_argv);
     // Инициализация DRS
-    if(drs_cmd_init(NULL) != 0){
-        log_it(L_CRITICAL, "Can't init drs protocol");
-        return -13;
+    int l_ret;
+    if( (l_ret = drs_cmd_init(NULL)) != 0){
+        if (l_ret == -1 ){
+            dap_cli_server_cmd_set_reply_text(a_str_reply, "Already initialized, passing this step");
+            return -1;
+        }
+
+        dap_cli_server_cmd_set_reply_text(a_str_reply,  "Can't init drs protocol, code %d", l_ret);
+        return l_ret;
     }
     dap_cli_server_cmd_set_reply_text(a_str_reply, "DRS initialized");
     return 0;
@@ -505,6 +513,7 @@ static int s_callback_calibrate(int a_argc, char ** a_argv, char **a_str_reply)
                 .ampl = {
                     .repeats = l_repeats,
                     .N = l_N,
+                    .splash_gauntlet = DRS_CAL_SPLASH_GAUNTLET_DEFAULT
                 },
                 .time_global = {
                     .num_cycle = l_num_cycle
