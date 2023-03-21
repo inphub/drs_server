@@ -34,30 +34,11 @@ add_subdirectory(libs/libdrs)
 # Сервер
 set (SERVER_SOURCES
      sources/main_server.c
-     sources/drs_proto.c
-     sources/drs_proto_cmd.c
-     sources/drs_cli.c
-     sources/sig_unix_handler.c
-    )
-set (SERVER_HEADERS
-     sources/drs_proto.h
-     sources/drs_proto_cmd.h
-     sources/drs_cli.h
-     sources/sig_unix_handler.h
     )
 # Консолька к серверу
 set (CLI_SOURCES
     sources/main_cli.c
     )
-
-# Тесты
-set (TESTS_SOURCES
-    sources/main_server2.c
-    )
-set (TESTS_HEADERS
-    sources/main.c
-    )
-
 
 #-- Определяем исполняемый файл и библиотеки к нему
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
