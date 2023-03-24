@@ -26,9 +26,9 @@ int main(int argc, const char **argv)
     // Имя приложения
     dap_set_appname("drs_server");
     dap_sdk_init(NULL);
-    dap_sdk_parse_args(argc, argv);
+    //dap_sdk_parse_args(argc, argv);
 
-
+    log_it(L_DEBUG, "DRS init...");
     if(drs_init() != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -12;

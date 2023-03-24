@@ -1,5 +1,5 @@
 # Минимально потребная версия Cmake
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 
 # ----  Общие настройки -----
@@ -42,10 +42,10 @@ set (CLI_SOURCES
 
 #-- Определяем исполняемый файл и библиотеки к нему
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
-target_link_libraries(${PROJECT_NAME} dap_core dap_crypto dap_io dap_cli_server drs)
+target_link_libraries(${PROJECT_NAME} dap_sdk_static libdrs_static)
 
 add_executable(drs_client ${CLI_SOURCES})
-target_link_libraries(drs_client dap_core dap_app_cli)
+target_link_libraries(drs_client dap_sdk_static dap_app_cli)
 
 #--- Описываем действия при инсталляции
 set(CMAKE_INSTALL_PREFIX /opt/drs_server)
