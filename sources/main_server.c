@@ -1,11 +1,7 @@
 #include <unistd.h>
 
-#include <dap_common.h>
-#include <dap_config.h>
-#include <dap_events.h>
-#include <dap_cli_server.h>
-
 #include <dap_sdk.h>
+#include <dap_cli_server.h>
 
 #include "drs.h"
 #include "drs_proto.h"

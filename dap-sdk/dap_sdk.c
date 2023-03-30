@@ -140,13 +140,12 @@ int dap_sdk_init(const char * a_json_args,... )
 
     save_process_pid_in_file( g_dap_vars.sys.pid_file_path);
 
-    dap_server_t *l_server = NULL;
     if ( g_dap_vars.io.server.enabled ) {
 
         int32_t l_port = dap_config_get_item_int32(g_config, "server", "listen_port_tcp");
 
         if( l_port > 0 ) {
-            l_server = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
+            g_dap_vars.io.server.tcp = dap_server_new( (dap_config_get_item_str(g_config, "server", "listen_address")),
                                       (uint16_t) l_port, SERVER_TCP, NULL );
         } else
             log_it( L_WARNING, "Server is enabled but no port is defined" );

@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 set(DAP_SDK_NATIVE_VERSION "3.0-0")
+set(CMAKE_C_STANDARD 11)
+
 project (dap_sdk)
 
 file(GLOB DAP_SDK_SRCS
@@ -47,8 +49,8 @@ endif()
 if (DAPSDK_MODULES MATCHES "app-cli")
     add_subdirectory(modules/net/app-cli)
     add_subdirectory(modules/net/server/cli_server)
-    target_link_libraries(${PROJECT_NAME} dap_cli_server)
-    target_link_libraries(${PROJECT_NAME}_static dap_cli_server)
+    target_link_libraries(${PROJECT_NAME} dap_app_cli dap_cli_server)
+    target_link_libraries(${PROJECT_NAME}_static dap_app_cli dap_cli_server)
 endif()
 
 if (DAPSDK_MODULES MATCHES "plugins")

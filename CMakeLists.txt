@@ -27,6 +27,7 @@ set(DAPSDK_MODULES "core crypto io app-cli")
 add_subdirectory(dap-sdk)
 
 # Подключаем библиотеку DRS
+set (DRS_OWN_DAP_SDK ON)
 add_subdirectory(libs/libdrs)
 
 # ---- Непосредственно подключение файлов проекта ---
@@ -42,7 +43,7 @@ set (CLI_SOURCES
 
 #-- Определяем исполняемый файл и библиотеки к нему
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
-target_link_libraries(${PROJECT_NAME} dap_sdk_static libdrs_static)
+target_link_libraries(${PROJECT_NAME} dap_sdk_static drs_static)
 
 add_executable(drs_client ${CLI_SOURCES})
 target_link_libraries(drs_client dap_sdk_static dap_app_cli)
