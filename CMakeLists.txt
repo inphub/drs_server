@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.10)
 # Название проекта и указание основного языка
 project(drs_server LANGUAGES C)
 # Этот инклуд реализует парсинг файлов и всасывание результатов в переменную
-include(dap-sdk/cmake/ReadMKFile.cmake)
+include(dap-sdk/share/cmake/ReadMKFile.cmake)
 # Общие настройки
 set(CMAKE_ENABLE_EXPORTS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -16,15 +16,20 @@ set(CMAKE_C_STANDARD 11)
 SET( CPACK_PACKAGE_VERSION_MAJOR ${VERSION_MAJOR})
 SET( CPACK_PACKAGE_VERSION_MINOR ${VERSION_MINOR})
 SET( CPACK_PACKAGE_VERSION_PATCH ${VERSION_PATCH})
-add_definitions("-DDAP_VERSION=\"${VERSION_MAJOR}-${VERSION_MINOR}.${VERSION_PATCH}\"")
+#add_definitions("-DDAP_VERSION=\"${VERSION_MAJOR}-${VERSION_MINOR}.${VERSION_PATCH}\"")
 
 # Инклуд с определением операционки и выставлением различных дефайнов общего назначения
 # А так же выставление флагов для релиза и для отладки
-include(dap-sdk/cmake/OS_Detection.cmake)
+include(dap-sdk/share/cmake/OS_Detection.cmake)
 # Перечисление модулей DAP SDK которые нам нужны
 set(DAPSDK_MODULES "core crypto io app-cli")
+# Включаем статическую сборку компонент
+option(DAP_SDK_BUILD_STATIC ON)
+set(BUILD_STATIC ON)
 # Подключение DAP SDK
 add_subdirectory(dap-sdk)
+
+set(DAP_SDK_PATH "../../dap-sdk")
 
 # Подключаем библиотеку DRS
 set (DRS_OWN_DAP_SDK ON)
@@ -43,10 +48,10 @@ set (CLI_SOURCES
 
 #-- Определяем исполняемый файл и библиотеки к нему
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
-target_link_libraries(${PROJECT_NAME} dap_sdk_static drs_static)
+target_link_libraries(${PROJECT_NAME} dap_sdk drs)
 
 add_executable(drs_client ${CLI_SOURCES})
-target_link_libraries(drs_client dap_sdk_static dap_app_cli)
+target_link_libraries(drs_client dap_sdk dap_app_cli)
 
 #--- Описываем действия при инсталляции
 set(CMAKE_INSTALL_PREFIX /opt/drs_server)

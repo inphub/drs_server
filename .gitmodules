@@ -1,4 +1,9 @@
 [submodule "libdrs/"]
 	url = git@github.com:dmitriigerasimov/libdrs.git
 	branch = master
-
+[submodule "libs/libadc"]
+	path = libs/libadc
+	url = ../libadc
+[submodule "dap-sdk"]
+	path = dap-sdk
+	url = ../dap-sdk
