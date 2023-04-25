@@ -27,13 +27,18 @@ set(DAPSDK_MODULES "core crypto io app-cli")
 option(DAP_SDK_BUILD_STATIC ON)
 set(BUILD_STATIC ON)
 # Подключение DAP SDK
-add_subdirectory(dap-sdk)
+if(BUILD_STATIC)
+    # Подключаем библиотеку DRS
+    set (DRS_OWN_DAP_SDK OFF)
+    add_subdirectory(libs/libdrs)
+    add_subdirectory(dap-sdk)
+    #set(DAP_SDK_PATH "../../dap-sdk")
+else()
+    set(DAP_SDK_PATH "/opt/dap-sdk")
+    set(LIBDRS_PATH "/opt/cyclone_v_devices/adc105000_4")
+endif()
 
-set(DAP_SDK_PATH "../../dap-sdk")
 
-# Подключаем библиотеку DRS
-set (DRS_OWN_DAP_SDK ON)
-add_subdirectory(libs/libdrs)
 
 # ---- Непосредственно подключение файлов проекта ---
 
@@ -46,12 +51,21 @@ set (CLI_SOURCES
     sources/main_cli.c
     )
 
+
 #-- Определяем исполняемый файл и библиотеки к нему
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
+if(NOT BUILD_STATIC)
+    target_link_directories(${PROJECT_NAME} PUBLIC ${DAP_SDK_PATH}/lib ${LIBDRS_PATH}/lib )
+    include_directories(${DAP_SDK_PATH}/include)
+    include_directories(${LIBDRS_PATH}/include)
+endif()
+
 target_link_libraries(${PROJECT_NAME} dap_sdk drs)
 
-add_executable(drs_client ${CLI_SOURCES})
-target_link_libraries(drs_client dap_sdk dap_app_cli)
+#add_executable(drs_client ${CLI_SOURCES})
+#target_link_directories(drs_client PUBLIC ${DAP_SDK_PATH}/lib ${LIBDRS_PATH}/lib )
+#include_directories(${DAP_SDK_PATH}/include)
+#target_link_libraries(drs_client dap_sdk)
 
 #--- Описываем действия при инсталляции
 set(CMAKE_INSTALL_PREFIX /opt/drs_server)
@@ -64,4 +78,4 @@ set(SHAREDIR ${CMAKE_INSTALL_PREFIX}/share)
 
 INSTALL(DIRECTORY dist/ DESTINATION ${SHAREDIR} FILES_MATCHING PATTERN "*" PATTERN "*")
 INSTALL(TARGETS drs_server DESTINATION ${BINDIR})
-INSTALL(TARGETS drs_client DESTINATION ${BINDIR})
+#INSTALL(TARGETS drs_client DESTINATION ${BINDIR})
