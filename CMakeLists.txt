@@ -1,13 +1,13 @@
-# Минимально потребная версия Cmake
+# РњРёРЅРёРјР°Р»СЊРЅРѕ РїРѕС‚СЂРµР±РЅР°СЏ РІРµСЂСЃРёСЏ Cmake
 cmake_minimum_required(VERSION 3.10)
 
 
-# ----  Общие настройки -----
-# Название проекта и указание основного языка
+# ----  РћР±С‰РёРµ РЅР°СЃС‚СЂРѕР№РєРё -----
+# РќР°Р·РІР°РЅРёРµ РїСЂРѕРµРєС‚Р° Рё СѓРєР°Р·Р°РЅРёРµ РѕСЃРЅРѕРІРЅРѕРіРѕ СЏР·С‹РєР°
 project(drs_server LANGUAGES C)
-# Этот инклуд реализует парсинг файлов и всасывание результатов в переменную
+# Р­С‚РѕС‚ РёРЅРєР»СѓРґ СЂРµР°Р»РёР·СѓРµС‚ РїР°СЂСЃРёРЅРі С„Р°Р№Р»РѕРІ Рё РІСЃР°СЃС‹РІР°РЅРёРµ СЂРµР·СѓР»СЊС‚Р°С‚РѕРІ РІ РїРµСЂРµРјРµРЅРЅСѓСЋ
 include(dap-sdk/share/cmake/ReadMKFile.cmake)
-# Общие настройки
+# РћР±С‰РёРµ РЅР°СЃС‚СЂРѕР№РєРё
 set(CMAKE_ENABLE_EXPORTS ON)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_COLOR_MAKEFILE   ON)
@@ -18,17 +18,17 @@ SET( CPACK_PACKAGE_VERSION_MINOR ${VERSION_MINOR})
 SET( CPACK_PACKAGE_VERSION_PATCH ${VERSION_PATCH})
 #add_definitions("-DDAP_VERSION=\"${VERSION_MAJOR}-${VERSION_MINOR}.${VERSION_PATCH}\"")
 
-# Инклуд с определением операционки и выставлением различных дефайнов общего назначения
-# А так же выставление флагов для релиза и для отладки
+# РРЅРєР»СѓРґ СЃ РѕРїСЂРµРґРµР»РµРЅРёРµРј РѕРїРµСЂР°С†РёРѕРЅРєРё Рё РІС‹СЃС‚Р°РІР»РµРЅРёРµРј СЂР°Р·Р»РёС‡РЅС‹С… РґРµС„Р°Р№РЅРѕРІ РѕР±С‰РµРіРѕ РЅР°Р·РЅР°С‡РµРЅРёСЏ
+# Рђ С‚Р°Рє Р¶Рµ РІС‹СЃС‚Р°РІР»РµРЅРёРµ С„Р»Р°РіРѕРІ РґР»СЏ СЂРµР»РёР·Р° Рё РґР»СЏ РѕС‚Р»Р°РґРєРё
 include(dap-sdk/share/cmake/OS_Detection.cmake)
-# Перечисление модулей DAP SDK которые нам нужны
+# РџРµСЂРµС‡РёСЃР»РµРЅРёРµ РјРѕРґСѓР»РµР№ DAP SDK РєРѕС‚РѕСЂС‹Рµ РЅР°Рј РЅСѓР¶РЅС‹
 set(DAPSDK_MODULES "core crypto io app-cli")
-# Включаем статическую сборку компонент
+# Р’РєР»СЋС‡Р°РµРј СЃС‚Р°С‚РёС‡РµСЃРєСѓСЋ СЃР±РѕСЂРєСѓ РєРѕРјРїРѕРЅРµРЅС‚
 option(DAP_SDK_BUILD_STATIC ON)
 set(BUILD_STATIC ON)
-# Подключение DAP SDK
+# РџРѕРґРєР»СЋС‡РµРЅРёРµ DAP SDK
 if(BUILD_STATIC)
-    # Подключаем библиотеку DRS
+    # РџРѕРґРєР»СЋС‡Р°РµРј Р±РёР±Р»РёРѕС‚РµРєСѓ DRS
     set (DRS_OWN_DAP_SDK OFF)
     add_subdirectory(libs/libdrs)
     add_subdirectory(dap-sdk)
@@ -40,19 +40,19 @@ endif()
 
 
 
-# ---- Непосредственно подключение файлов проекта ---
+# ---- РќРµРїРѕСЃСЂРµРґСЃС‚РІРµРЅРЅРѕ РїРѕРґРєР»СЋС‡РµРЅРёРµ С„Р°Р№Р»РѕРІ РїСЂРѕРµРєС‚Р° ---
 
-# Сервер
+# РЎРµСЂРІРµСЂ
 set (SERVER_SOURCES
      sources/main_server.c
     )
-# Консолька к серверу
+# РљРѕРЅСЃРѕР»СЊРєР° Рє СЃРµСЂРІРµСЂСѓ
 set (CLI_SOURCES
     sources/main_cli.c
     )
 
 
-#-- Определяем исполняемый файл и библиотеки к нему
+#-- РћРїСЂРµРґРµР»СЏРµРј РёСЃРїРѕР»РЅСЏРµРјС‹Р№ С„Р°Р№Р» Рё Р±РёР±Р»РёРѕС‚РµРєРё Рє РЅРµРјСѓ
 add_executable(drs_server ${SERVER_SOURCES} ${SERVER_HEADERS})
 if(NOT BUILD_STATIC)
     target_link_directories(${PROJECT_NAME} PUBLIC ${DAP_SDK_PATH}/lib ${LIBDRS_PATH}/lib )
@@ -67,7 +67,7 @@ target_link_libraries(${PROJECT_NAME} dap_sdk drs)
 #include_directories(${DAP_SDK_PATH}/include)
 #target_link_libraries(drs_client dap_sdk)
 
-#--- Описываем действия при инсталляции
+#--- РћРїРёСЃС‹РІР°РµРј РґРµР№СЃС‚РІРёСЏ РїСЂРё РёРЅСЃС‚Р°Р»Р»СЏС†РёРё
 set(CMAKE_INSTALL_PREFIX /opt/drs_server)
 set(BINDIR ${CMAKE_INSTALL_PREFIX}/bin)
 set(CONFIGDIR ${CMAKE_INSTALL_PREFIX}/etc)
