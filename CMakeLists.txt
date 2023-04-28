@@ -25,13 +25,14 @@ include(dap-sdk/share/cmake/OS_Detection.cmake)
 set(DAPSDK_MODULES "core crypto io app-cli")
 # Включаем статическую сборку компонент
 option(DAP_SDK_BUILD_STATIC ON)
+
 set(BUILD_STATIC ON)
 # Подключение DAP SDK
 if(BUILD_STATIC)
     # Подключаем библиотеку DRS
     set (DRS_OWN_DAP_SDK OFF)
-    add_subdirectory(libs/libdrs)
     add_subdirectory(dap-sdk)
+    add_subdirectory(libs/libdrs)
     #set(DAP_SDK_PATH "../../dap-sdk")
 else()
     set(DAP_SDK_PATH "/opt/dap-sdk")
