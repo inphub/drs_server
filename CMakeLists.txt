@@ -26,7 +26,7 @@ set(DAPSDK_MODULES "core crypto io app-cli")
 # Включаем статическую сборку компонент
 option(DAP_SDK_BUILD_STATIC ON)
 
-set(BUILD_STATIC ON)
+option(BUILD_STATIC ON)
 # Подключение DAP SDK
 if(BUILD_STATIC)
     # Подключаем библиотеку DRS
