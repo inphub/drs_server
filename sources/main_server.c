@@ -23,6 +23,10 @@ int main(int argc, const char **argv)
     dap_set_appname("drs_server");
     dap_sdk_init(NULL);
     //dap_sdk_parse_args(argc, argv);
+    dap_sdk_init_proto(NULL);
+    drs_proto_init(NULL);
+
+
 
     log_it(L_DEBUG, "DRS init...");
     if(drs_init(0x3) != 0){
@@ -30,11 +34,13 @@ int main(int argc, const char **argv)
         return -12;
     }
 
-    // Инициализация протокола
-    if(drs_proto_init( g_dap_vars.io.server.tcp ) != 0){
+
+    if(drs_proto_init(g_dap_vars.io.server.tcp ) != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
-        return -13;
+        return -12;
     }
+
+
 
     // Добавление кастомной команды
     dap_cli_server_cmd_add ("drs_server", s_callback_drs_server, "DRS server brief",
@@ -48,9 +54,11 @@ int main(int argc, const char **argv)
     log_it( l_rc ? L_CRITICAL : L_NOTICE, "Server loop stopped with return code %d", l_rc );
 
     // Деинициализация
-    dap_sdk_deinit();
     drs_proto_deinit();
     drs_deinit();
+
+    dap_sdk_deinit_proto();
+    dap_sdk_deinit();
 
     return l_rc * 10;
 }
