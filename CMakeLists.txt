@@ -20,7 +20,6 @@ SET( CPACK_PACKAGE_VERSION_PATCH ${VERSION_PATCH})
 
 # Инклуд с определением операционки и выставлением различных дефайнов общего назначения
 # А так же выставление флагов для релиза и для отладки
-include(dap-sdk/share/cmake/OS_Detection.cmake)
 # Перечисление модулей DAP SDK которые нам нужны
 set(DAPSDK_MODULES "core crypto io app-cli")
 # Включаем статическую сборку компонент
@@ -31,12 +30,14 @@ option(BUILD_STATIC ON)
 if(BUILD_STATIC)
     # Подключаем библиотеку DRS
     set (DRS_OWN_DAP_SDK OFF)
+    include(dap-sdk/share/cmake/OS_Detection.cmake)
     add_subdirectory(dap-sdk)
     add_subdirectory(libs/libdrs)
     #set(DAP_SDK_PATH "../../dap-sdk")
 else()
     set(DAP_SDK_PATH "/opt/dap-sdk")
     set(LIBDRS_PATH "/opt/cyclone_v_devices/adc105000_4")
+    include(${DAP_SDK_PATH}/share/cmake/OS_Detection.cmake)
 endif()
 
 
