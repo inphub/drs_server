@@ -30,8 +30,8 @@ int main(int argc, const char **argv)
 
     log_it(L_DEBUG, "DRS init...");
     if(drs_init(DRS_INIT_ENABLE_DRS_0 |DRS_INIT_ENABLE_DRS_1 |
-                DRS_INIT_SET_ALWAYS_FREQ | DRS_INIT_SET_DATA_CUT_FROM_BEGIN | DRS_INIT_SET_DATA_CUT_FROM_END,
-                4, 2, 50 )
+                DRS_INIT_SET_ONCE_FREQ | DRS_INIT_SET_DATA_CUT_FROM_BEGIN | DRS_INIT_SET_DATA_CUT_FROM_END,
+                4, 2, 50, NULL )
                  != 0){
         log_it(L_CRITICAL, "Can't init drs protocol");
         return -12;
